@@ -240,9 +240,54 @@ ddns mock [provider] [--port p] [--tls-proxy] [--zone z]
 
 ---
 
-## 4. 变更约定
+## 4. 插件系统（第三方 provider）
+
+第三方 provider **不需要改本仓库**——装包即发现：
+
+```bash
+npm install ddns-provider-foo     # 约定命名，装进 node_modules 即可
+```
+
+### 插件包契约
+
+包名以 `ddns-provider-` 开头（支持 `@scope/ddns-provider-*`），default export
+（或 named `plugin`）导出：
+
+```js
+export default {
+  providers: ["foo", { name: "foo2", style: "zone" }],  // 提供的 provider 名
+  createProvider(cfg) { return new FooProvider(cfg); },  // 必须：返回 ZoneProvider | PushProvider
+  createMock(opts) { return { url, state, stop }; },     // 可选：mock 支持
+};
+```
+
+`createProvider(cfg)` 收到 flat `ProviderConfig`（token/secret/…），返回
+`ZoneProvider` 或 `PushProvider`（见 §1.1 类型）。
+
+### 库 API
+
+```ts
+discoverPlugins(cwd?): string[]        // 扫描 node_modules 的 ddns-provider-* 并加载（幂等）
+registerProvider(name, factory)        // 显式注册单个 provider 工厂
+registerPlugin(plugin)                 // 注册整个插件对象（宿主内置插件用）
+registry.list(): string[]              // 当前已注册的插件 provider 名
+```
+
+- `createProvider()` 内置 provider 找不到时自动查插件注册表；
+- `startMockProvider()` 同样支持插件的 `createMock`；
+- CLI 启动时自动 `discoverPlugins()`；
+- 加载失败的插件只记日志，**绝不破坏宿主**。
+
+### 安全边界
+
+插件是**可执行代码**——只在显式安装进 node_modules 时才会被加载，与 npm
+生态的常规信任模型一致（如同任何 dependency）。
+
+---
+
+## 5. 变更约定
 
 - 新增 provider：`src/providers/rest-specs.ts`（REST 类 ~15 行）或 `dyndns-services.ts`（一行）或手写类；更新本清单。
 - 新增导出：`src/index.ts` 必须 re-export，本文档 §1 同步。
 - 新增 CLI 命令：`src/cli.ts` usage + 本文档 §2 同步。
-- 接口变更必须过 `npm run verify`（typecheck + 88 测试 + build）。
+- 接口变更必须过 `npm run verify`（typecheck + 测试 + build）。

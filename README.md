@@ -101,6 +101,11 @@ LD_PRELOAD。详见 `docs/design.md`。
 凭据也支持环境变量：`DDNS_CLOUDFLARE_TOKEN`、`DDNS_DNSPOD_TOKEN`、
 `DDNS_ALIYUN_ACCESS_KEY_ID` / `DDNS_ALIYUN_ACCESS_KEY_SECRET`、`DDNS_DUCKDNS_TOKEN`。
 
+## 插件：第三方 provider
+
+`npm install ddns-provider-xxx` → 自动发现（命名约定），无需改本仓库。
+插件导出 `{ providers, createProvider, createMock? }`，详见 `docs/api.md` §4。
+
 ## 开发
 
 ```bash

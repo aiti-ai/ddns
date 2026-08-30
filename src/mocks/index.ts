@@ -24,6 +24,7 @@ import { startCustomMock, type CustomMockHandle, type CustomMockOptions } from "
 import { startFreednsMock, type FreednsMockHandle, type FreednsMockOptions } from "./freedns.ts";
 import { startRestMock, type RestMockHandle, type RestMockOptions } from "./rest.ts";
 import { startDyndnsMock, type DyndnsMockHandle, type DyndnsMockOptions } from "./dyndns.ts";
+import { registry } from "../plugins.ts";
 
 export type AnyMockHandle = CloudflareMockHandle | DnspodMockHandle | AliyunMockHandle | DuckdnsMockHandle | CustomMockHandle | FreednsMockHandle | RestMockHandle | DyndnsMockHandle;
 
@@ -56,7 +57,11 @@ export async function startMockProvider(name: MockProviderName, opts: Record<str
     case "duckdns": return startDuckdnsMock(opts as DuckdnsMockOptions);
     case "custom": return startCustomMock(opts as CustomMockOptions);
     case "freedns": return startFreednsMock(opts as FreednsMockOptions);
-    default: return startMockFor(name, opts as { zone?: string; cred?: string });
+    default: {
+      const pluginMock = registry.getMock(name);
+      if (pluginMock) return pluginMock(opts as { zone?: string; cred?: string; port?: number }) as AnyMockHandle;
+      return startMockFor(name, opts as { zone?: string; cred?: string });
+    }
   }
 }
 

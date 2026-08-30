@@ -12,6 +12,7 @@ import { createFreedns } from "./providers/freedns/index.ts";
 import { createDreamhost, createDondominio, createNetcup, createNamesilo, createSpaceship } from "./providers/special.ts";
 import { createRoute53 } from "./providers/route53.ts";
 import { createGcp } from "./providers/gcp.ts";
+import { registry } from "./plugins.ts";
 import { RestProvider } from "./providers/rest.ts";
 import { REST_SPECS } from "./providers/rest-specs.ts";
 import { DyndnsProvider } from "./providers/dyndns.ts";
@@ -54,7 +55,11 @@ export function createProvider(cfg: ProviderConfig): DnsProvider {
         const password = cfg.password ?? cfg.token ?? process.env[`DDNS_${dyn.name.toUpperCase()}_PASSWORD`] ?? "";
         return new DyndnsProvider(dyn, { username, password, baseUrl: cfg.baseUrl });
       }
-      throw new Error(`unknown provider: ${cfg.provider}`);
+      const pluginFactory = registry.getFactory(cfg.provider);
+      if (pluginFactory) return pluginFactory(cfg);
+      throw new Error(
+        `unknown provider: ${cfg.provider} — install a 'ddns-provider-<name>' npm package and call discoverPlugins(), or registerProvider(name, factory)`,
+      );
     }
   }
 }

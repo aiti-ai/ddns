@@ -61,6 +61,9 @@ export type { BeaconOptions, BeaconResult, BeaconType } from "./beacon.ts";
 export { setBeacon, beaconValue, isBeaconType } from "./beacon.ts";
 
 export type { ServeOptions, ServeStatus, ServeHandle } from "./serve.ts";
+
+export { registry, registerProvider, registerPlugin, discoverPlugins, PLUGIN_PREFIX } from "./plugins.ts";
+export type { DdnsPlugin, PluginProviderSpec, ProviderFactory, MockFactory } from "./plugins.ts";
 export { startServe } from "./serve.ts";
 
 export { configPath, readConfig, writeConfig } from "./config.ts";

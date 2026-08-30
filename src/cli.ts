@@ -8,6 +8,7 @@ import { runOnce, startLoop } from "./engine.ts";
 import { readConfig, configPath } from "./config.ts";
 import { resolvePublicIp } from "./ip.ts";
 import { startMockProvider, startTlsProxy, type MockProviderName } from "./mocks/index.ts";
+import { discoverPlugins } from "./plugins.ts";
 
 import { REST_SPEC_NAMES } from "./providers/rest-specs.ts";
 import { DYNDNS_SERVICE_NAMES } from "./providers/dyndns-services.ts";
@@ -129,6 +130,12 @@ function resolveConfigFile(args: Args): string {
 }
 
 async function main(): Promise<void> {
+  // third-party providers: load installed ddns-provider-* packages
+  try {
+    discoverPlugins();
+  } catch {
+    // discovery must never block the CLI
+  }
   const { cmd, args } = parseArgs(process.argv.slice(2));
   const sub = cmd[0] ?? "";
   const out = (o: unknown) => process.stdout.write(JSON.stringify(o, null, args.json ? 2 : 0) + "\n");
