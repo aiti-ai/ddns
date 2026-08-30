@@ -111,10 +111,12 @@ export interface ProviderConfig {
   password?: string;
   /** Base URL override (tests point providers at their mocks). */
   baseUrl?: string;
+  /** localzone: zone file path. */
+  zone?: string;
 }
 
 /** Fetch-like used by every provider (injectable; default = global fetch). */
 export type FetchLike = (
   url: string,
   init?: { method?: string; headers?: Record<string, string>; body?: string },
-) => Promise<{ ok: boolean; status: number; text(): Promise<string>; json(): Promise<unknown> }>;
+) => Promise<{ ok: boolean; status: number; headers?: Record<string, string>; text(): Promise<string>; json(): Promise<unknown> }>;

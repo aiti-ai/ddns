@@ -10,7 +10,7 @@ import { createDuckdns } from "./providers/duckdns/index.ts";
 import { createCustom } from "./providers/custom/index.ts";
 import { createFreedns } from "./providers/freedns/index.ts";
 import { createDreamhost, createDondominio, createNetcup, createNamesilo, createSpaceship, createNamecheap, createDnsmadeeasy, createUltradns, createConstellix, createDnsservices } from "./providers/special.ts";
-import { createAurora, createCloudxns, createYandex, createGratisdns, createTransip, createQcloud, createHostingde, createHttpnet, createWedos, createNfsn, createYandexcloud, createValuedomain, createRackspace, createMemset, createGehirn, createRcodezero, createDevnomads, createMisaka, createDinahosting, createJoker, createPowerdns, createDirectadmin, createInfoblox, createAzure } from "./providers/lexicon-more.ts";
+import { createAurora, createCloudxns, createYandex, createGratisdns, createTransip, createQcloud, createHostingde, createHttpnet, createWedos, createNfsn, createYandexcloud, createValuedomain, createRackspace, createMemset, createGehirn, createRcodezero, createDevnomads, createMisaka, createDinahosting, createJoker, createPowerdns, createDirectadmin, createInfoblox, createAzure, createOci, createSoftlayer, createPlesk, createEuserv, createLocalzone, createEasyname, createGransy, createHover } from "./providers/lexicon-more.ts";
 import { createRoute53 } from "./providers/route53.ts";
 import { createGcp } from "./providers/gcp.ts";
 import { normalizeName } from "./providers/common.ts";
@@ -69,6 +69,15 @@ export function createProvider(cfg: ProviderConfig): DnsProvider {
     case "directadmin": return createDirectadmin(cfg);
     case "infoblox": return createInfoblox(cfg);
     case "azure": return createAzure(cfg);
+    case "oci": return createOci(cfg);
+    case "softlayer": return createSoftlayer(cfg);
+    case "plesk": return createPlesk(cfg);
+    case "henet": return createHeAlias(cfg);
+    case "euserv": return createEuserv(cfg);
+    case "localzone": return createLocalzone(cfg);
+    case "easyname": return createEasyname(cfg);
+    case "gransy": return createGransy(cfg);
+    case "hover": return createHover(cfg);
     case "linode4": return createLinodeAlias(cfg);
     case "zeit": return createVercelAlias(cfg);
     case "dreamhost": return createDreamhost(cfg);
@@ -154,6 +163,15 @@ function createLinodeAlias(cfg: ProviderConfig): DnsProvider {
   const spec = REST_SPECS.find((s) => s.name === "linode");
   if (!spec) throw new Error("linode spec missing");
   return new RestProvider(spec, cfg);
+}
+function createHeAlias(cfg: ProviderConfig): DnsProvider {
+  // he.net's public API is the dyndns2 updater ("he"); "henet" is lexicon's
+  // web-session variant — alias to the dyndns2 provider for updates.
+  const dyn = DYNDNS_SERVICES.find((s) => s.name === "he");
+  if (!dyn) throw new Error("he spec missing");
+  const username = cfg.username ?? cfg.token ?? "";
+  const password = cfg.password ?? cfg.secret ?? "";
+  return new DyndnsProvider(dyn, { username, password, baseUrl: cfg.baseUrl });
 }
 function createVercelAlias(cfg: ProviderConfig): DnsProvider {
   const spec = REST_SPECS.find((s) => s.name === "vercel");

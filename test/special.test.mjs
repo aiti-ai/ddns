@@ -10,7 +10,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 
 const { DreamhostProvider, DondominioProvider, NetcupProvider, NamesiloProvider, SpaceshipProvider, NamecheapProvider, DnsmadeeasyProvider, UltradnsProvider, ConstellixProvider, DnsservicesProvider } = await import("../src/providers/special.ts");
-const { AuroraProvider, CloudxnsProvider, YandexProvider, TransipProvider, QcloudProvider, HostingdeProvider, WedosProvider, NfsnProvider, YandexcloudProvider, ValuedomainProvider, RackspaceProvider, MemsetProvider, GehirnProvider, RcodezeroProvider, DevnomadsProvider, MisakaProvider, DinahostingProvider, JokerProvider, PowerdnsProvider, DirectadminProvider, InfobloxProvider, AzureProvider } = await import("../src/providers/lexicon-more.ts");
+const { AuroraProvider, CloudxnsProvider, YandexProvider, TransipProvider, QcloudProvider, HostingdeProvider, WedosProvider, NfsnProvider, YandexcloudProvider, ValuedomainProvider, RackspaceProvider, MemsetProvider, GehirnProvider, RcodezeroProvider, DevnomadsProvider, MisakaProvider, DinahostingProvider, JokerProvider, PowerdnsProvider, DirectadminProvider, InfobloxProvider, AzureProvider, OciProvider, SoftlayerProvider, PleskProvider, EuservProvider, LocalzoneProvider, EasynameProvider, GransyProvider, HoverProvider } = await import("../src/providers/lexicon-more.ts");
 const { Route53Provider, awsSigV4 } = await import("../src/providers/route53.ts");
 const { GcpProvider } = await import("../src/providers/gcp.ts");
 
@@ -813,6 +813,205 @@ test("azure: OAuth token flow + ARM DNS recordset PUT", async () => {
     assert.equal(listed[0].value, "1.1.1.1");
     const apiCall = seen.find((c) => c.url.includes("/recordsets?") && c.auth);
     assert.equal(apiCall.auth, "Bearer tok1");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ---------------------------------- oci ---------------------------------- */
+
+test("oci: RSA-signed requests + zones/records", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization, date: req.headers.date });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.method === "GET") res.end(JSON.stringify({ items: [{ fqdn: "home.example.com.", rtype: "A", rdata: "1.1.1.1", ttl: 300 }] }));
+    else res.end(JSON.stringify({}));
+  });
+  try {
+    const { generateKeyPairSync } = await import("node:crypto");
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" });
+    const p = new OciProvider({ apiKeyPem: pem, userOcid: "user1", tenancyOcid: "ten1", fingerprint: "fp1", region: "us-ashburn-1", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.match(seen[0].auth, /^Signature keyId="ten1\/user1\/fp1"/);
+    assert.ok(seen[0].date);
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- softlayer ------------------------------- */
+
+test("softlayer: REST basic auth + DnsDomain records", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url.includes("getByDomainName")) res.end(JSON.stringify([{ id: 123 }]));
+    else if (req.url.includes("getResourceRecords")) res.end(JSON.stringify([{ id: "r1", type: "A", data: "1.1.1.1", ttl: 300 }]));
+    else res.end(JSON.stringify({ id: "r2" }));
+  });
+  try {
+    const p = new SoftlayerProvider({ username: "u", apiKey: "k", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].auth, "Basic " + Buffer.from("u:k").toString("base64"));
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* --------------------------------- plesk --------------------------------- */
+
+test("plesk: XML-RPC packet with dns add/get records", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push({ url: req.url, xml: body });
+      res.writeHead(200, { "content-type": "text/xml" });
+      if (body.includes("<site><get>")) res.end('<?xml version="1.0"?><packet><site><get><result><id>7</id></result></get></site></packet>');
+      else if (body.includes("<dns><get_rec>")) res.end('<?xml version="1.0"?><packet><dns><get_rec><result><rec><id>r1</id><type>A</type><host>home.example.com</host><value>1.1.1.1</value></rec></result></get_rec></dns></packet>');
+      else res.end('<?xml version="1.0"?><packet><dns><add_rec><result><status>ok</status></result></add_rec></dns></packet>');
+    });
+  });
+  try {
+    const p = new PleskProvider({ username: "u", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.ok(seen[0].xml.includes("<packet>"));
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* --------------------------------- euserv -------------------------------- */
+
+test("euserv: login → choose_order → kc2 dns records", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push(req.url);
+    res.writeHead(200, { "content-type": "text/html" });
+    if (req.url.includes("subaction=login")) res.end("<html>ord_no=42</html>");
+    else if (req.url.includes("kc2_domain_dns_get_records")) res.end("<table><tr><td>home.example.com</td><td>A</td><td>1.1.1.1</td></tr></table>");
+    else res.end("<html>ok</html>");
+  });
+  try {
+    const p = new EuservProvider({ email: "e", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.ok(seen.some((u) => u.includes("ord_no=42")));
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- localzone ------------------------------- */
+
+test("localzone: reads/writes a BIND zone file (no network)", async () => {
+  const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "ddns-lz-"));
+  const file = join(dir, "example.com.zone");
+  writeFileSync(file, "$ORIGIN example.com.\n@ 300 IN SOA ns1 hostmaster 1 3600 600 86400 300\nhome 300 IN A 1.1.1.1\n");
+  try {
+    const p = new LocalzoneProvider({ file });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].type, "A");
+    assert.equal(listed[0].value, "1.1.1.1");
+    await p.createRecord("example.com", { type: "A", name: "new.example.com", value: "2.2.2.2" });
+    const after = await p.listRecords("example.com", { name: "new.example.com" });
+    assert.equal(after.length, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/* -------------------------------- easyname ------------------------------- */
+
+test("easyname: CSRF token + cookie session + DNS CRUD", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, csrf: req.headers["x-csrf-token"], cookie: req.headers.cookie });
+    if (req.url === "/en/login") {
+      res.writeHead(200, { "set-cookie": "CSRF-TOKEN=tok1; Path=/" });
+      res.end("<html>login</html>");
+    } else if (req.url.includes("authentication-api/login")) {
+      res.writeHead(200, { "set-cookie": "JSESSIONID=s1; Path=/" });
+      res.end(JSON.stringify({ redirectUrl: "/en/dashboard" }));
+    } else if (req.url.includes("dns/index")) {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end('<table><tr data-id="5"><td>home.example.com</td><td>A</td><td>1.1.1.1</td></tr></table>');
+    } else {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end("<html>ok</html>");
+    }
+  });
+  try {
+    const p = new EasynameProvider({ email: "e", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.ok(seen.some((c) => c.csrf === "tok1"));
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* --------------------------------- gransy -------------------------------- */
+
+test("gransy: SOAP XML envelope + DNS zone records", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push({ url: req.url, xml: body });
+      res.writeHead(200, { "content-type": "text/xml" });
+      if (body.includes("Login")) res.end("<soap:Envelope><soap:Body><LoginResponse/></soap:Body></soap:Envelope>");
+      else if (body.includes("Get_DNS_Zone")) res.end("<soap:Envelope><soap:Body><Get_DNS_ZoneResponse><record><id>r1</id><type>A</type><name>home.example.com</name><rdata>1.1.1.1</rdata></record></Get_DNS_ZoneResponse></soap:Body></soap:Envelope>");
+      else res.end("<soap:Envelope><soap:Body><ok/></soap:Body></soap:Envelope>");
+    });
+  });
+  try {
+    const p = new GransyProvider({ username: "u", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.ok(seen[0].xml.includes("<soap:Envelope"));
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* --------------------------------- hover --------------------------------- */
+
+test("hover: cookie session (session + auth) + control_panel/dns", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, cookie: req.headers.cookie });
+    if (req.url === "/signin") {
+      res.writeHead(200, { "set-cookie": "hover_session=s1; Path=/" });
+      res.end("<!DOCTYPE html>");
+    } else if (req.url.includes("auth.json")) {
+      res.writeHead(200, { "set-cookie": "hoverauth=a1; Path=/" });
+      res.end(JSON.stringify({}));
+    } else if (req.url.includes("/dns/")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ domain: { dns: [{ id: "r1", type: "A", name: "home.example.com", content: "1.1.1.1", ttl: 300 }] } }));
+    } else {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("{}");
+    }
+  });
+  try {
+    const p = new HoverProvider({ username: "u", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    const dnsCall = seen.find((c) => c.url.includes("/dns/"));
+    assert.ok(dnsCall.cookie.includes("hover_session=s1"));
   } finally {
     await new Promise((r) => srv.close(r));
   }
