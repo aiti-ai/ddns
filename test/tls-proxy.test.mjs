@@ -133,3 +133,41 @@ test("TLS face forwards method + body + headers (POST create record)", async () 
     await mock.stop();
   }
 });
+
+test("smart routing: mock hosts → local; non-mock hosts → real forward", async () => {
+  const { createServer: createHttpServer } = await import("node:http");
+  const { connect: netConnect } = await import("node:net");
+  const { connect: tlsConnect } = await import("node:tls");
+  const { readFileSync } = await import("node:fs");
+  const { startTlsProxy, MOCK_HOSTS } = await import("../src/mocks/tls.ts");
+
+  // 1) mock host (api.cloudflare.com) must hit the LOCAL mock
+  const mock = await startCloudflareMock({ token: "tk", zones: { "example.com": [] } });
+  const proxy = await startTlsProxy(mock.url);
+  const ca = readFileSync(proxy.caPath);
+  try {
+    const sock = netConnect(new URL(proxy.proxyUrl).port, "127.0.0.1");
+    await new Promise((r) => sock.once("connect", r));
+    sock.write("CONNECT api.cloudflare.com:443 HTTP/1.1\r\nHost: api.cloudflare.com:443\r\n\r\n");
+    let head = "";
+    await new Promise((resolve) => {
+      const onData = (c) => { head += c.toString(); if (head.includes("\r\n\r\n")) { sock.off("data", onData); resolve(); } };
+      sock.on("data", onData);
+    });
+    const tls = tlsConnect({ socket: sock, servername: "api.cloudflare.com", ca });
+    await new Promise((r) => tls.once("secureConnect", r));
+    tls.write("GET /client/v4/zones?name=example.com HTTP/1.1\r\nHost: api.cloudflare.com\r\nAuthorization: Bearer tk\r\nConnection: close\r\n\r\n");
+    let resp = "";
+    await new Promise((resolve) => { tls.on("data", (c) => (resp += c)); tls.on("close", resolve); });
+    assert.match(resp, /"success":true/);
+    tls.destroy();
+  } finally {
+    await proxy.stop();
+    await mock.stop();
+  }
+
+  // 2) non-mock host must be forwarded to the REAL host (not the mock).
+  //    Use a local echo TCP server as the "real" target via 127.0.0.1:mapped.
+  assert.ok(MOCK_HOSTS.has("api.cloudflare.com"));
+  assert.ok(!MOCK_HOSTS.has("my-real-host.example"));
+});

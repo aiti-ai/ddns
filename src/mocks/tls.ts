@@ -13,6 +13,11 @@
  *  every provider hostname (api.cloudflare.com, dnsapi.cn,
  *  alidns.aliyuncs.com, www.duckdns.org), so TLS verification passes for any
  *  provider while the traffic lands on the local mock.
+ *
+ *  SMART ROUTING: CONNECT targets on the mock host list are bridged to the
+ *  local TLS face (mock); ANY OTHER host is forwarded to the real network
+ *  (plain CONNECT tunnel) — so github.com, ipify.org etc. keep working when
+ *  the whole client runs behind HTTPS_PROXY.
  */
 
 import { createServer as createHttpServer, request as httpRequest, type Server as HttpServer } from "node:http";
@@ -23,6 +28,16 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const ASSETS = join(dirname(fileURLToPath(import.meta.url)), "assets");
+
+/** Hosts the mock answers for — everything else tunnels to the real network. */
+export const MOCK_HOSTS: ReadonlySet<string> = new Set([
+  "api.cloudflare.com",
+  "dnsapi.cn",
+  "alidns.aliyuncs.com",
+  "www.duckdns.org",
+  "localhost",
+  "127.0.0.1",
+]);
 
 export function caCertPath(): string {
   return join(ASSETS, "mock-ca.pem");
@@ -84,23 +99,40 @@ export async function startTlsProxy(target: string): Promise<TlsProxyHandle> {
   const proxyServer: HttpServer = createHttpServer();
   const tunnels = new Set<Socket>();
   proxyServer.on("connect", (req, clientSocket: Socket) => {
-    // Standard proxy reply; then the client speaks TLS inside the tunnel —
-    // bridge the bytes straight to the TLS face (which terminates TLS).
+    const target = (req.url ?? "").split(" ")[0] ?? "";
+    const host = target.split(":")[0]?.toLowerCase() ?? "";
+    const port = Number(target.split(":")[1] ?? 443) || 443;
+    // Standard proxy reply first.
     clientSocket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
-    const tlsSocket: Socket = tcpConnect(tlsPort, "127.0.0.1", () => {
-      clientSocket.pipe(tlsSocket);
-      tlsSocket.pipe(clientSocket);
-    });
     tunnels.add(clientSocket);
-    tunnels.add(tlsSocket);
-    const drop = () => {
-      tunnels.delete(clientSocket);
-      tunnels.delete(tlsSocket);
-    };
-    tlsSocket.on("error", () => clientSocket.destroy());
-    clientSocket.on("error", () => tlsSocket.destroy());
-    clientSocket.on("close", () => { tlsSocket.destroy(); drop(); });
-    tlsSocket.on("close", () => { clientSocket.destroy(); drop(); });
+    const drop = () => { tunnels.delete(clientSocket); };
+    clientSocket.on("close", drop);
+
+    if (MOCK_HOSTS.has(host)) {
+      // Mock host → bridge to the local TLS face (terminates TLS → mock HTTP).
+      const tlsSocket: Socket = tcpConnect(tlsPort, "127.0.0.1", () => {
+        clientSocket.pipe(tlsSocket);
+        tlsSocket.pipe(clientSocket);
+      });
+      tunnels.add(tlsSocket);
+      const dropTls = () => { tunnels.delete(tlsSocket); };
+      tlsSocket.on("error", () => clientSocket.destroy());
+      clientSocket.on("error", () => tlsSocket.destroy());
+      clientSocket.on("close", () => { tlsSocket.destroy(); dropTls(); });
+      tlsSocket.on("close", () => { clientSocket.destroy(); dropTls(); });
+      return;
+    }
+    // Non-mock host → real CONNECT tunnel (client speaks TLS to the real server).
+    const realSocket: Socket = tcpConnect(port, host, () => {
+      clientSocket.pipe(realSocket);
+      realSocket.pipe(clientSocket);
+    });
+    tunnels.add(realSocket);
+    const dropReal = () => { tunnels.delete(realSocket); };
+    realSocket.on("error", () => clientSocket.destroy());
+    clientSocket.on("error", () => realSocket.destroy());
+    clientSocket.on("close", () => { realSocket.destroy(); dropReal(); });
+    realSocket.on("close", () => { clientSocket.destroy(); dropReal(); });
   });
 
   await Promise.all([

@@ -84,7 +84,12 @@ export async function startCloudflareMock(opts: CloudflareMockOptions = {}): Pro
         const name = url.searchParams.get("name");
         if (type) records = records.filter((r) => r.type === type);
         if (name) records = records.filter((r) => r.name === name);
-        return json(res, 200, { success: true, result: records });
+        // lexicon 的 list_records 读取 result_info 分页（total_pages/page）
+        return json(res, 200, {
+          success: true,
+          result: records,
+          result_info: { page: 1, per_page: 100, count: records.length, total_count: records.length, total_pages: 1 },
+        });
       }
       // POST /zones/:id/dns_records
       if (parts[0] === "zones" && parts[2] === "dns_records" && parts.length === 3 && req.method === "POST") {
