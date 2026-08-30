@@ -34,6 +34,9 @@ export async function startDnspodMock(opts: DnspodMockOptions = {}): Promise<Dns
     res.end(JSON.stringify(body));
   };
   const ok = (res: ServerResponse, data: unknown = {}) => json(res, { status: { code: "1", message: "Action completed successful" }, data });
+  // 真实 DNSPod 的 Record.* 响应字段在 TOP level（{status, records/record/id}）
+  // 而非 data 包裹 —— 用 okTop 模拟真实形状
+  const okTop = (res: ServerResponse, body: unknown = {}) => json(res, { status: { code: "1", message: "Action completed successful" }, ...(body as Record<string, unknown>) });
   const fail = (res: ServerResponse, code: string, message: string) => json(res, { status: { code, message } });
 
   const server: Server = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -53,7 +56,7 @@ export async function startDnspodMock(opts: DnspodMockOptions = {}): Promise<Dns
           const domain = params.get("domain");
           const exists = state.records.some((r) => r.name.endsWith(`.${domain}`) || r.name === domain);
           if (!exists) return fail(res, "8", "Domain not found");
-          return ok(res, { id: randomUUID(), name: domain });
+          return okTop(res, { id: randomUUID(), name: domain });
         }
         case "Record.List": {
           const domain = params.get("domain");
@@ -68,7 +71,7 @@ export async function startDnspodMock(opts: DnspodMockOptions = {}): Promise<Dns
             ...r,
             name: r.name === domain ? "@" : r.name.replace(`.${domain}`, ""),
           }));
-          return ok(res, { records: shaped });
+          return okTop(res, { records: shaped });
         }
         case "Record.Create": {
           const domain = params.get("domain") ?? "";
@@ -83,7 +86,8 @@ export async function startDnspodMock(opts: DnspodMockOptions = {}): Promise<Dns
             line: params.get("record_line") ?? "默认",
           };
           state.records.push(rec);
-          return ok(res, { id: rec.id });
+          // 真实 DNSPod 返回 {record: {id, name, status, ...}} —— 模拟真实形状
+          return okTop(res, { record: { id: rec.id, name: rec.name, status: "enabled" } });
         }
         case "Record.Modify": {
           const id = params.get("record_id");
@@ -92,14 +96,14 @@ export async function startDnspodMock(opts: DnspodMockOptions = {}): Promise<Dns
           rec.type = params.get("record_type") ?? rec.type;
           rec.value = params.get("value") ?? rec.value;
           rec.ttl = Number(params.get("ttl") ?? rec.ttl);
-          return ok(res, { id });
+          return okTop(res, { id });
         }
         case "Record.Remove": {
           const id = params.get("record_id");
           const idx = state.records.findIndex((r) => r.id === id);
           if (idx < 0) return fail(res, "8", "Record not found");
           state.records.splice(idx, 1);
-          return ok(res, { id });
+          return okTop(res, { id });
         }
         default:
           return fail(res, "15", `Unknown action ${action}`);

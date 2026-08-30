@@ -56,7 +56,8 @@ export class DnspodProvider implements ZoneProvider {
       body: formEncode({ login_token: this.#token, format: "json", ...params }),
     });
     const body = (await res.json().catch(() => null)) as { status?: DnspodStatus; data?: unknown } | null;
-    if (!body || body.status?.code !== "1") {
+    // code "10" = 记录列表为空 — a legal empty result, not an error
+    if (!body || (body.status?.code !== "1" && body.status?.code !== "10")) {
       throw new ProviderError(
         `dnspod API error ${body?.status?.code ?? res.status}: ${body?.status?.message ?? "request failed"}`,
         "dnspod",
@@ -64,7 +65,10 @@ export class DnspodProvider implements ZoneProvider {
         body?.status?.code,
       );
     }
-    return (body.data ?? {}) as Record<string, unknown>;
+    // DNSPod returns payload fields at the TOP level ({status, records,
+    // domain, ...}) — not under "data". Return the whole body so callers
+    // read e.g. body.records / body.domain.
+    return body as unknown as Record<string, unknown>;
   }
 
   async listRecords(zone: string, filter?: ListFilter): Promise<DnsRecord[]> {
@@ -97,7 +101,9 @@ export class DnspodProvider implements ZoneProvider {
       ttl: rec.ttl ?? 600,
       ...(rec.priority !== undefined ? { mx: rec.priority } : {}),
     });
-    return { id: String((data as { id?: string | number }).id ?? "") };
+    // Record.Create 返回 {record: {id, ...}} —— id 在 record 对象里
+    const rid = (data.record as { id?: string | number } | undefined)?.id ?? (data as { id?: string | number }).id;
+    return { id: String(rid ?? "") };
   }
 
   async updateRecord(zone: string, rec: DnsRecord, id: string): Promise<void> {
