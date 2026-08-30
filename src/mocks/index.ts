@@ -14,15 +14,16 @@
  *  startMockProvider(name, opts), or all of them with startAllMocks().
  */
 
-export type MockProviderName = "cloudflare" | "dnspod" | "aliyun" | "duckdns" | "custom";
+export type MockProviderName = "cloudflare" | "dnspod" | "aliyun" | "duckdns" | "custom" | "freedns";
 
 import { startCloudflareMock, type CloudflareMockHandle, type CloudflareMockOptions } from "./cloudflare.ts";
 import { startDnspodMock, type DnspodMockHandle, type DnspodMockOptions } from "./dnspod.ts";
 import { startAliyunMock, type AliyunMockHandle, type AliyunMockOptions } from "./aliyun.ts";
 import { startDuckdnsMock, type DuckdnsMockHandle, type DuckdnsMockOptions } from "./duckdns.ts";
 import { startCustomMock, type CustomMockHandle, type CustomMockOptions } from "./custom.ts";
+import { startFreednsMock, type FreednsMockHandle, type FreednsMockOptions } from "./freedns.ts";
 
-export type AnyMockHandle = CloudflareMockHandle | DnspodMockHandle | AliyunMockHandle | DuckdnsMockHandle | CustomMockHandle;
+export type AnyMockHandle = CloudflareMockHandle | DnspodMockHandle | AliyunMockHandle | DuckdnsMockHandle | CustomMockHandle | FreednsMockHandle;
 
 export type MockOptionsMap = {
   cloudflare: CloudflareMockOptions;
@@ -30,6 +31,7 @@ export type MockOptionsMap = {
   aliyun: AliyunMockOptions;
   duckdns: DuckdnsMockOptions;
   custom: CustomMockOptions;
+  freedns: FreednsMockOptions;
 };
 
 export async function startMockProvider<N extends MockProviderName>(name: N, opts: MockOptionsMap[N] = {} as MockOptionsMap[N]): Promise<AnyMockHandle> {
@@ -39,6 +41,7 @@ export async function startMockProvider<N extends MockProviderName>(name: N, opt
     case "aliyun": return startAliyunMock(opts as AliyunMockOptions);
     case "duckdns": return startDuckdnsMock(opts as DuckdnsMockOptions);
     case "custom": return startCustomMock(opts as CustomMockOptions);
+    case "freedns": return startFreednsMock(opts as FreednsMockOptions);
     default: throw new Error(`unknown mock provider: ${name}`);
   }
 }
@@ -50,17 +53,18 @@ export interface AllMocksHandle {
 
 /** Start every provider mock (aliyun needs a zone). */
 export async function startAllMocks(opts: { aliyunZone: string } = { aliyunZone: "example.com" }): Promise<AllMocksHandle> {
-  const [cloudflare, dnspod, aliyun, duckdns, custom] = await Promise.all([
+  const [cloudflare, dnspod, aliyun, duckdns, custom, freedns] = await Promise.all([
     startCloudflareMock(),
     startDnspodMock(),
     startAliyunMock({ zone: opts.aliyunZone }),
     startDuckdnsMock(),
     startCustomMock(),
+    startFreednsMock(),
   ]);
   return {
-    handles: { cloudflare, dnspod, aliyun, duckdns, custom },
+    handles: { cloudflare, dnspod, aliyun, duckdns, custom, freedns },
     stopAll: async () => {
-      await Promise.all([cloudflare.stop(), dnspod.stop(), aliyun.stop(), duckdns.stop(), custom.stop()]);
+      await Promise.all([cloudflare.stop(), dnspod.stop(), aliyun.stop(), duckdns.stop(), custom.stop(), freedns.stop()]);
     },
   };
 }
@@ -70,6 +74,7 @@ export { startDnspodMock } from "./dnspod.ts";
 export { startAliyunMock } from "./aliyun.ts";
 export { startDuckdnsMock } from "./duckdns.ts";
 export { startCustomMock } from "./custom.ts";
+export { startFreednsMock } from "./freedns.ts";
 export { startTlsProxy, caCertPath, serverCertPath } from "./tls.ts";
 
 export type { CloudflareMockHandle, CloudflareMockOptions, CloudflareMockState } from "./cloudflare.ts";
@@ -77,3 +82,4 @@ export type { DnspodMockHandle, DnspodMockOptions, DnspodMockState } from "./dns
 export type { AliyunMockHandle, AliyunMockOptions, AliyunMockState } from "./aliyun.ts";
 export type { DuckdnsMockHandle, DuckdnsMockOptions, DuckdnsMockState } from "./duckdns.ts";
 export type { CustomMockHandle, CustomMockOptions, CustomMockState } from "./custom.ts";
+export type { FreednsMockHandle, FreednsMockOptions, FreednsMockState } from "./freedns.ts";

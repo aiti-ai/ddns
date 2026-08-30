@@ -24,7 +24,9 @@ src/
 ├── client.ts       # lexicon 式 CRUD + createProvider 注册表 + upsert
 ├── engine.ts       # Go 式 DDNS：detect → compare → push；runOnce / startLoop
 ├── config.ts       # ddns.json（0600，原子写）
-├── cli.ts          # 命令：ip / mock / list / create / update / delete / sync / config
+├── cli.ts          # 命令：ip / mock / list / create / update / delete / beacon / sync / serve / config
+├── beacon.ts       # 信标：任意值（CNAME/TXT）同步到固定名字（维度 2）
+├── serve.ts        # serve 模式：更新循环 + 状态 API（GET /status、POST /update）
 ├── providers/      # 5 家实现（注入 fetch + baseUrl，可测）
 │   └── common.ts   # ProviderError / splitZone / formEncode
 └── mocks/          # ★ 每供应商一个 mock（真实 HTTP 形状）+ TLS 代理面
@@ -78,10 +80,12 @@ resolver 不走 NSS），但：
 | `test/engine.test.mjs` | DDNS 语义（create/update/unchanged/disabled/no-ip）、loop、upsert、config 0600、IP 探测容错 | Go update 循环 |
 | `test/cli.test.mjs` | CLI 端到端（spawn cli.ts）对 mock | — |
 | `test/tls-proxy.test.mjs` | CONNECT→TLS→HTTP 全流程（模拟 Go 客户端）、直接 TLS 面、POST 透传 | Go net/http 行为 |
+| `test/features.test.mjs` | freedns 响应文本规则、beacon 任意值同步、serve 状态 API | Go freedns / 维度 2 |
 
 ## 6. 后续（未做）
 
-- 更多供应商（route53 / godaddy / freedns / namecheap…）——接口已就位，按
-  `providers/<name>/index.ts` 模式添加即可；
+- 更多供应商（route53 / godaddy / namecheap…）——接口已就位，按
+  `providers/<name>/index.ts` 模式添加即可（freedns 已作为 push 型新范例）；
 - `--tls-proxy` 下 lexicon 的 `api_endpoint` 实例属性覆盖用法文档；
-- 服务端进程模式（`ddns serve`，常驻循环 + 状态查询 API，对齐 ddns-updater WebUI）。
+- service-tunnels 集成：`beacon` API + tunnel url 事件联动（远端服务器无人值守
+  注册当前 tunnel 域名的完整闭环）。

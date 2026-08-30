@@ -43,10 +43,17 @@ export {
   AliyunProvider,
   DuckdnsProvider,
   CustomProvider,
+  FreednsProvider,
 } from "./providers/index.ts";
 
 export type { DdnsEntry, DdnsResult, DdnsDeps, DdnsLoopHandle } from "./engine.ts";
 export { updateEntry, runOnce, startLoop } from "./engine.ts";
+
+export type { BeaconOptions, BeaconResult, BeaconType } from "./beacon.ts";
+export { setBeacon, beaconValue, isBeaconType } from "./beacon.ts";
+
+export type { ServeOptions, ServeStatus, ServeHandle } from "./serve.ts";
+export { startServe } from "./serve.ts";
 
 export { configPath, readConfig, writeConfig } from "./config.ts";
 
@@ -57,6 +64,7 @@ export {
   startAliyunMock,
   startDuckdnsMock,
   startCustomMock,
+  startFreednsMock,
   startMockProvider,
   startAllMocks,
   startTlsProxy,
@@ -79,6 +87,9 @@ export type {
   CustomMockHandle,
   CustomMockOptions,
   CustomMockState,
+  FreednsMockHandle,
+  FreednsMockOptions,
+  FreednsMockState,
   MockProviderName,
   MockOptionsMap,
   AllMocksHandle,

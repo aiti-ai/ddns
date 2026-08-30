@@ -9,7 +9,7 @@ import { readConfig, configPath } from "./config.ts";
 import { resolvePublicIp } from "./ip.ts";
 import { startMockProvider, startTlsProxy, type MockProviderName } from "./mocks/index.ts";
 
-const PROVIDERS = ["cloudflare", "dnspod", "aliyun", "duckdns", "custom"];
+const PROVIDERS = ["cloudflare", "dnspod", "aliyun", "duckdns", "custom", "freedns"];
 
 function usage(): void {
   console.log(`ddns — DDNS + DNS record management (cloudflare/dnspod/aliyun/duckdns/custom)
@@ -23,8 +23,12 @@ function usage(): void {
   ddns update <provider> <domain> --id <rid> --name <owner|fqdn> --type <t> --value <v> [--ttl <s>] [creds...]
   ddns delete <provider> <domain> --id <rid> [creds...]
                                             # or delete by lookup: --name <fqdn> --type <t>
+  ddns beacon <provider> <domain> --name <fqdn> --value <host|url> [--type CNAME|TXT] [creds...]
+                                            # keep a FIXED name pointing at an arbitrary
+                                            # value (tunnel discovery beacon)
   ddns sync [--config <file>] [--once] [--loop] [--interval <sec>]
                                             # DDNS: point every entry at the current public IP
+  ddns serve [--config <file>] [--port <p>]  # loop + status API (GET /status, POST /update)
   ddns config path | show [--config <file>]
 
   creds: --token <t> | --secret <s> | --access-key-id <k> | --zone-id <zid> |
@@ -52,6 +56,7 @@ interface Args {
   ipv6key?: string;
   successRegex?: string;
   baseUrl?: string;
+  beaconType?: string;
   once?: boolean;
   loop?: boolean;
   interval?: number;
@@ -83,6 +88,7 @@ function parseArgs(argv: string[]): { cmd: string[]; args: Args } {
       case "--ipv6key": args.ipv6key = argv[++i]; break;
       case "--success-regex": args.successRegex = argv[++i]; break;
       case "--base-url": args.baseUrl = argv[++i]; break;
+      case "--beacon-type": args.beaconType = argv[++i]; break;
       case "--once": args.once = true; break;
       case "--loop": args.loop = true; break;
       case "--interval": args.interval = Number(argv[++i]); break;
@@ -136,7 +142,7 @@ async function main(): Promise<void> {
         console.error(`unknown provider: ${provider} (known: ${PROVIDERS.join(", ")})`);
         process.exit(2);
       }
-      const names: MockProviderName[] = provider ? [provider] : ["cloudflare", "dnspod", "aliyun", "duckdns", "custom"];
+      const names: MockProviderName[] = provider ? [provider] : ["cloudflare", "dnspod", "aliyun", "duckdns", "custom", "freedns"];
       const started: unknown[] = [];
       for (const n of names) {
         const h = await startMockProvider(n, { zone: args.zone ?? "example.com", port: args.port } as never);
@@ -206,6 +212,17 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "beacon": {
+      const provider = cmd[1];
+      const domain = cmd[2];
+      if (!provider || !domain || !args.name || !args.value) return usage();
+      const { setBeacon } = await import("./beacon.ts");
+      const cfg = { provider, ...credsFromArgs(args) };
+      const type = (args.beaconType === "TXT" ? "TXT" : "CNAME") as "CNAME" | "TXT";
+      out(await setBeacon({ provider: cfg, zone: args.zone ?? domain, name: args.name, type, value: args.value, ttl: args.ttl }));
+      break;
+    }
+
     case "sync": {
       const file = resolveConfigFile(args);
       const dir = dirname(file);
@@ -221,6 +238,22 @@ async function main(): Promise<void> {
         await new Promise(() => {});
       }
       out(await runOnce(entries));
+      break;
+    }
+
+    case "serve": {
+      const file = resolveConfigFile(args);
+      const entries = readConfig(dirname(file)).filter((e) => e.enabled !== false);
+      if (!entries.length) {
+        console.error(`no ddns entries in ${file} — see 'ddns config path'`);
+        process.exit(2);
+      }
+      const { startServe } = await import("./serve.ts");
+      const handle = await startServe({ entries, port: args.port, log: (l) => process.stdout.write(l + "\n") });
+      out({ statusUrl: `${handle.url}/status`, updateUrl: `${handle.url}/update` });
+      process.on("SIGINT", async () => { await handle.stop(); process.exit(0); });
+      process.on("SIGTERM", async () => { await handle.stop(); process.exit(0); });
+      await new Promise(() => {});
       break;
     }
 

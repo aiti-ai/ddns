@@ -1,6 +1,6 @@
 # ddns
 
-DDNS + DNS 记录管理，多供应商（cloudflare / dnspod / aliyun / duckdns / custom webhook）。
+DDNS + DNS 记录管理，多供应商（cloudflare / dnspod / aliyun / duckdns / custom webhook / freedns）。
 
 合并两家成熟项目的设计：
 
@@ -92,6 +92,7 @@ LD_PRELOAD。详见 `docs/design.md`。
 | aliyun | zone（RPC + HMAC 签名） | AccessKey | 同上 | `src/mocks/aliyun.ts`（验签） |
 | duckdns | push（GET update） | token | A/AAAA | `src/mocks/duckdns.ts`（OK/KO） |
 | custom | push（webhook） | URL + successRegex | A/AAAA | `src/mocks/custom.ts` |
+| freedns | push（afraid.org） | token | A/AAAA | `src/mocks/freedns.ts`（响应文本判定） |
 
 凭据也支持环境变量：`DDNS_CLOUDFLARE_TOKEN`、`DDNS_DNSPOD_TOKEN`、
 `DDNS_ALIYUN_ACCESS_KEY_ID` / `DDNS_ALIYUN_ACCESS_KEY_SECRET`、`DDNS_DUCKDNS_TOKEN`。

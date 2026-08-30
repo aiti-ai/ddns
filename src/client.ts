@@ -8,6 +8,7 @@ import { createDnspod } from "./providers/dnspod/index.ts";
 import { createAliyun } from "./providers/aliyun/index.ts";
 import { createDuckdns } from "./providers/duckdns/index.ts";
 import { createCustom } from "./providers/custom/index.ts";
+import { createFreedns } from "./providers/freedns/index.ts";
 
 export type ProviderLike = DnsProvider;
 
@@ -28,6 +29,7 @@ export function createProvider(cfg: ProviderConfig): DnsProvider {
     case "aliyun": return createAliyun(cfg);
     case "duckdns": return createDuckdns(cfg);
     case "custom": return createCustom(cfg);
+    case "freedns": return createFreedns(cfg);
     default:
       throw new Error(`unknown provider: ${cfg.provider}`);
   }

@@ -55,6 +55,8 @@ export interface DdnsDeps {
   /** IP detector override (default: resolvePublicIp). */
   detectIp?: typeof resolvePublicIp;
   log?: (line: string) => void;
+  /** Called after every completed update run (loop + manual runOnce). */
+  onResults?: (results: DdnsResult[]) => void;
 }
 
 /** One update cycle for one entry. Never throws — errors land on the result. */
@@ -124,6 +126,7 @@ export function startLoop(entries: DdnsEntry[], deps: DdnsDeps = {}): DdnsLoopHa
     running = true;
     try {
       const results = await runOnce(entries, deps);
+      deps.onResults?.(results);
       for (const r of results) {
         if (r.error) log(`[ddns] ${r.name}: ERROR ${r.error}`);
         else if (r.changed) log(`[ddns] ${r.name}: ${r.record} → ${r.ip} (${r.type})`);
