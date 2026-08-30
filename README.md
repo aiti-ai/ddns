@@ -1,6 +1,6 @@
 # ddns
 
-DDNS + DNS 记录管理，多供应商（cloudflare / dnspod / aliyun / duckdns / custom webhook / freedns）。
+DDNS + DNS 记录管理，多供应商（**61 家**：cloudflare / dnspod / aliyun / duckdns / custom / freedns / 14 家 REST zone API / 28 家 dyndns2 / 7 家特例）。
 
 合并两家成熟项目的设计：
 
@@ -95,6 +95,7 @@ LD_PRELOAD。详见 `docs/design.md`。
 | freedns | push（afraid.org） | token | A/AAAA | `src/mocks/freedns.ts`（响应文本判定） |
 | **14 家 REST zone API** | digitalocean / gandi / godaddy / hostinger / ionos / linode / luadns / namecom / porkbun / scaleway / servercow / vultr / hetznercloud / bunny | Bearer/API-Key/Basic（按各家） | 同上 | `src/mocks/rest.ts`（spec 驱动） |
 | **28 家 dyndns2** | allinkl / changeip / dd24 / ddnss / dnsomatic / dyn / dynu / dynv6 / easydns / gigahostno / goip / he / infomaniak / inwx / ipv64 / loopia / myaddr / namecheap / njalla / noip / nowdns / opendns / ovh / selfhostde / spdyn / strato / variomedia / zoneedit | basic auth / token | A/AAAA | `src/mocks/dyndns.ts`（spec 驱动） |
+| **7 家特例** | dreamhost（cmd API）/ dondominio（push JSON）/ netcup（会话流）/ namesilo（key API）/ spaceship（双密钥头）/ **route53（AWS SigV4 + XML）** / **gcp（OAuth JSON）** | 各家认证 | zone CRUD / push | `test/special.test.mjs` 内嵌 mock |
 
 凭据也支持环境变量：`DDNS_CLOUDFLARE_TOKEN`、`DDNS_DNSPOD_TOKEN`、
 `DDNS_ALIYUN_ACCESS_KEY_ID` / `DDNS_ALIYUN_ACCESS_KEY_SECRET`、`DDNS_DUCKDNS_TOKEN`。

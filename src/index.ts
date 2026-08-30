@@ -44,6 +44,14 @@ export {
   DuckdnsProvider,
   CustomProvider,
   FreednsProvider,
+  DreamhostProvider,
+  DondominioProvider,
+  NetcupProvider,
+  NamesiloProvider,
+  SpaceshipProvider,
+  Route53Provider,
+  awsSigV4,
+  GcpProvider,
 } from "./providers/index.ts";
 
 export type { DdnsEntry, DdnsResult, DdnsDeps, DdnsLoopHandle } from "./engine.ts";

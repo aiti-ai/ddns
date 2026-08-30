@@ -81,11 +81,23 @@ resolver 不走 NSS），但：
 | `test/cli.test.mjs` | CLI 端到端（spawn cli.ts）对 mock | — |
 | `test/tls-proxy.test.mjs` | CONNECT→TLS→HTTP 全流程（模拟 Go 客户端）、直接 TLS 面、POST 透传 | Go net/http 行为 |
 | `test/features.test.mjs` | freedns 响应文本规则、beacon 任意值同步、serve 状态 API | Go freedns / 维度 2 |
+| `test/specs.test.mjs` | 14 家 REST + 28 家 dyndns2 的 spec 驱动契约（自动遍历） | Go 各家 |
+| `test/special.test.mjs` | 特例：dreamhost/dondominio/netcup/namesilo/spaceship/route53(SigV4)/gcp | Go 各家 |
 
 ## 6. 后续（未做）
 
-- 更多供应商（route53 / godaddy / namecheap…）——接口已就位，按
-  `providers/<name>/index.ts` 模式添加即可（freedns 已作为 push 型新范例）；
 - `--tls-proxy` 下 lexicon 的 `api_endpoint` 实例属性覆盖用法文档；
 - service-tunnels 集成：`beacon` API + tunnel url 事件联动（远端服务器无人值守
   注册当前 tunnel 域名的完整闭环）。
+
+## 7. 供应商全景（61 家，对齐 Go ddns-updater + lexicon）
+
+| 类别 | 数量 | 实现 |
+|---|---|---|
+| 手写精装 | 6 | cloudflare / dnspod / aliyun / duckdns / custom / freedns |
+| REST zone API（spec 驱动） | 14 | digitalocean / gandi / godaddy / hostinger / ionos / linode / luadns / namecom / porkbun / scaleway / servercow / vultr / hetznercloud / bunny |
+| dyndns2（spec 驱动） | 28 | allinkl … zoneedit（见 `dyndns-services.ts`） |
+| 特例 | 7 | dreamhost / dondominio / netcup / namesilo / spaceship / route53(SigV4) / gcp(OAuth) |
+
+每家都有 mock（手写或 spec 通用）与契约测试；route53 的 SigV4 签名由 mock 侧
+行为验证，aliyun 的 HMAC 由 mock 验签。

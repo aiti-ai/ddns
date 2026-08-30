@@ -12,7 +12,7 @@ import { startMockProvider, startTlsProxy, type MockProviderName } from "./mocks
 import { REST_SPEC_NAMES } from "./providers/rest-specs.ts";
 import { DYNDNS_SERVICE_NAMES } from "./providers/dyndns-services.ts";
 
-const PROVIDERS = ["cloudflare", "dnspod", "aliyun", "duckdns", "custom", "freedns", ...REST_SPEC_NAMES, ...DYNDNS_SERVICE_NAMES];
+const PROVIDERS = ["cloudflare", "dnspod", "aliyun", "duckdns", "custom", "freedns", "dreamhost", "dondominio", "netcup", "namesilo", "spaceship", "route53", "gcp", ...REST_SPEC_NAMES, ...DYNDNS_SERVICE_NAMES];
 
 function usage(): void {
   console.log(`ddns — DDNS + DNS record management (cloudflare/dnspod/aliyun/duckdns/custom)

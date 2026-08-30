@@ -9,6 +9,9 @@ import { createAliyun } from "./providers/aliyun/index.ts";
 import { createDuckdns } from "./providers/duckdns/index.ts";
 import { createCustom } from "./providers/custom/index.ts";
 import { createFreedns } from "./providers/freedns/index.ts";
+import { createDreamhost, createDondominio, createNetcup, createNamesilo, createSpaceship } from "./providers/special.ts";
+import { createRoute53 } from "./providers/route53.ts";
+import { createGcp } from "./providers/gcp.ts";
 import { RestProvider } from "./providers/rest.ts";
 import { REST_SPECS } from "./providers/rest-specs.ts";
 import { DyndnsProvider } from "./providers/dyndns.ts";
@@ -34,6 +37,13 @@ export function createProvider(cfg: ProviderConfig): DnsProvider {
     case "duckdns": return createDuckdns(cfg);
     case "custom": return createCustom(cfg);
     case "freedns": return createFreedns(cfg);
+    case "dreamhost": return createDreamhost(cfg);
+    case "dondominio": return createDondominio(cfg);
+    case "netcup": return createNetcup(cfg);
+    case "namesilo": return createNamesilo(cfg);
+    case "spaceship": return createSpaceship(cfg);
+    case "route53": return createRoute53(cfg);
+    case "gcp": return createGcp(cfg);
     default: {
       // data-driven providers: rest specs + dyndns2 services
       const rest = REST_SPECS.find((s) => s.name === cfg.provider);
