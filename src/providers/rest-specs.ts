@@ -440,6 +440,394 @@ export const REST_SPECS: RestSpec[] = [
     },
     delete: { path: (_z, id, zid) => `/dnszone/${zid}/records/${id}` },
   },
-];
 
-export const REST_SPEC_NAMES: string[] = REST_SPECS.map((s) => s.name);
+  // ---------- lexicon-only providers (shapes from dns-lexicon source) ----------
+
+  // dnsimple: /accounts → id → /{account}/zones/{zone}/records
+  {
+    name: "dnsimple",
+    baseUrl: "https://api.dnsimple.com/v2",
+    auth: { type: "bearer", cfgField: "token", env: "DDNS_DNSIMPLE_TOKEN" },
+    preLookups: [{ path: () => "/accounts", idPath: "0.id", name: "account" }],
+    list: { path: (z, _zid, aid) => `/${aid}/zones/${z}/records`, recordsPath: ["data"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.content),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z, _zid, rec, aid) => `/${aid}/zones/${z}/records`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name.split(".")[0] === "@" ? "@" : rec.name, content: rec.value, ttl: rec.ttl ?? 3600 }),
+      idPath: ["data", "id"],
+    },
+    update: {
+      path: (z, id, _zid, aid) => `/${aid}/zones/${z}/records/${id}`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name.split(".")[0] === "@" ? "@" : rec.name, content: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "PATCH",
+    },
+    delete: { path: (z, id, _zid, aid) => `/${aid}/zones/${z}/records/${id}` },
+  },
+
+  // cloudns: /dns/records.json + add/mod/delete
+  {
+    name: "cloudns",
+    baseUrl: "https://api.cloudns.net",
+    auth: { type: "query", queryKey: "auth-id", cfgField: "token" },
+    list: { path: (z) => `/dns/records.json?domain-name=${z}`, recordsPath: [] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => {
+        const h = String(r.host ?? "");
+        const d = r.domain ? String(r.domain) : "";
+        if (!d) return h;
+        return h === "@" ? d : h.endsWith(`.${d}`) ? h : `${h}.${d}`;
+      },
+      value: (r) => String(r.record),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/dns/add-record.json?domain-name=${z}`,
+      body: (z, rec) => ({ host: rec.name.split(".")[0] === "@" ? "" : rec.name, record_type: rec.type, record: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "POST",
+    },
+    update: {
+      path: (z, id) => `/dns/mod-record.json?domain-name=${z}&record-id=${id}`,
+      body: (z, rec) => ({ host: rec.name.split(".")[0] === "@" ? "" : rec.name, record_type: rec.type, record: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "POST",
+    },
+    delete: { path: (z, id) => `/dns/delete-record.json?domain-name=${z}&record-id=${id}`, method: "POST" },
+  },
+
+  // glesys: /domain/list → records (host/data)
+  {
+    name: "glesys",
+    baseUrl: "https://api.glesys.com",
+    auth: { type: "basic", cfgField: "token", env: "DDNS_GLESYS_TOKEN" },
+    zoneIdLookup: { path: () => `/domain/list`, idPath: "response.records.0.domainname" },
+    list: { path: (z, zid) => `/domain/list_records/${z}`, recordsPath: ["response", "records"] },
+    fields: {
+      id: (r) => String(r.recordid ?? r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name ?? r.host ?? ""),
+      value: (r) => String(r.data ?? r.content),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/domain/add_record/${z}`,
+      body: (z, rec) => ({ host: rec.name.split(".")[0] === "@" ? "" : rec.name, type: rec.type, data: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "POST",
+    },
+    update: {
+      path: (z, id) => `/domain/update_record/${z}/${id}`,
+      body: (z, rec) => ({ host: rec.name.split(".")[0] === "@" ? "" : rec.name, type: rec.type, data: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "POST",
+    },
+    delete: { path: (z, id) => `/domain/delete_record/${z}/${id}`, method: "POST" },
+  },
+
+  // regfish: /api/v1/domain/{zone}/records (data field)
+  {
+    name: "regfish",
+    baseUrl: "https://api.regfish.de/api/v1",
+    auth: { type: "header", header: "Authorization", cfgField: "token", env: "DDNS_REGFISH_TOKEN" },
+    list: { path: (z) => `/domain/${z}/records`, recordsPath: ["data"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.data ?? r.content),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/domain/${z}/records`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, data: rec.value, ttl: rec.ttl ?? 3600 }),
+      idPath: ["data", "id"],
+    },
+    update: {
+      path: (z, id) => `/domain/${z}/records/${id}`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, data: rec.value, ttl: rec.ttl ?? 3600 }),
+    },
+    delete: { path: (z, id) => `/domain/${z}/records/${id}` },
+  },
+
+  // internetbs: /Domain/DnsRecord/List + Add + Update
+  {
+    name: "internetbs",
+    baseUrl: "https://api.internet.bs",
+    auth: { type: "query", queryKey: "api_key", cfgField: "token" },
+    list: { path: (z) => `/Domain/DnsRecord/List?Domain=${z}`, recordsPath: ["records"] },
+    fields: {
+      id: (r) => String(r.id ?? ""),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.value),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/Domain/DnsRecord/Add?Domain=${z}`,
+      body: (z, rec) => ({ Type: rec.type, Name: rec.name, Value: rec.value, TTL: rec.ttl ?? 3600 }),
+      method: "POST",
+    },
+    update: {
+      path: (z, id) => `/Domain/DnsRecord/Update?Domain=${z}&FullRecordID=${id}`,
+      body: (z, rec) => ({ Type: rec.type, Name: rec.name, Value: rec.value, TTL: rec.ttl ?? 3600 }),
+      method: "POST",
+    },
+    delete: { path: (z, id) => `/Domain/DnsRecord/Remove?Domain=${z}&FullRecordID=${id}`, method: "POST" },
+  },
+
+  // pointhq: /zones/{zone}/records
+  {
+    name: "pointhq",
+    baseUrl: "https://pointhq.com",
+    auth: { type: "basic", cfgField: "token", env: "DDNS_POINTHQ_TOKEN" },
+    list: { path: (z) => `/zones/${z}/records`, recordsPath: [] },
+    fields: {
+      id: (r) => {
+        const rec = (r.record_details ?? r.record) as Record<string, unknown> | undefined;
+        return String(rec?.id ?? r.id ?? "");
+      },
+      type: (r) => {
+        const rec = (r.record_details ?? r.record) as Record<string, unknown> | undefined;
+        return String(rec?.record_type ?? r.type);
+      },
+      name: (r) => {
+        const rec = (r.record_details ?? r.record) as Record<string, unknown> | undefined;
+        return String(rec?.name ?? r.name);
+      },
+      value: (r) => {
+        const rec = (r.record_details ?? r.record) as Record<string, unknown> | undefined;
+        return String(rec?.data ?? r.data);
+      },
+      ttl: (r) => {
+        const rec = (r.record_details ?? r.record) as Record<string, unknown> | undefined;
+        const t = rec?.ttl ?? r.ttl;
+        return t !== undefined ? Number(t) : undefined;
+      },
+    },
+    create: {
+      path: (z) => `/zones/${z}/records`,
+      body: (z, rec) => ({ record: { record_type: rec.type, name: rec.name, data: rec.value, ttl: rec.ttl ?? 3600 } }),
+      method: "POST",
+    },
+    update: {
+      path: (z, id) => `/zones/${z}/records/${id}`,
+      body: (z, rec) => ({ record: { record_type: rec.type, name: rec.name, data: rec.value, ttl: rec.ttl ?? 3600 } }),
+      method: "PATCH",
+    },
+    delete: { path: (z, id) => `/zones/${z}/records/${id}` },
+  },
+
+  // rage4: /rapi/createrecord / updaterecord / deleterecord
+  {
+    name: "rage4",
+    baseUrl: "https://rage4.com/rapi",
+    auth: { type: "query", queryKey: "accountKey", cfgField: "token" },
+    list: { path: (z) => `/getrecords?domain=${z}`, recordsPath: [] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.content),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/createrecord?domain=${z}`,
+      body: (z, rec) => ({ name: rec.name, type: rec.type, content: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "POST",
+    },
+    update: {
+      path: (z, _id) => `/updaterecord?domain=${z}&id={id}`,
+      body: (z, rec) => ({ name: rec.name, type: rec.type, content: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "POST",
+    },
+    delete: { path: (z, _id) => `/deleterecord?domain=${z}&id={id}`, method: "POST" },
+  },
+
+  // online.net: /api/v1/domain/{zone}/version/records
+  {
+    name: "online",
+    baseUrl: "https://api.online.net/api/v1",
+    auth: { type: "bearer", cfgField: "token", env: "DDNS_ONLINE_TOKEN" },
+    list: { path: (z) => `/domain/${z}/version/records`, recordsPath: [] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.data),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/domain/${z}/version/records`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, data: rec.value, ttl: rec.ttl ?? 3600 }),
+      idPath: ["id"],
+    },
+    update: {
+      path: (z, id) => `/domain/${z}/version/records/${id}`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, data: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "PATCH",
+    },
+    delete: { path: (z, id) => `/domain/${z}/version/records/${id}` },
+  },
+
+  // timeweb: /api/v1/domains/{zone}/dns-records
+  {
+    name: "timeweb",
+    baseUrl: "https://api.timeweb.cloud/api/v1",
+    auth: { type: "bearer", cfgField: "token", env: "DDNS_TIMEWEB_TOKEN" },
+    list: { path: (z) => `/domains/${z}/dns-records`, recordsPath: ["dns_records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.value),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/domains/${z}/dns-records`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, value: rec.value, ttl: rec.ttl ?? 3600 }),
+      idPath: ["dns_record", "id"],
+    },
+    update: {
+      path: (z, id) => `/domains/${z}/dns-records/${id}`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, value: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "PATCH",
+    },
+    delete: { path: (z, id) => `/domains/${z}/dns-records/${id}` },
+  },
+
+  // zonomi: /app/dns/query.jsp + modify.jsp (SET)
+  {
+    name: "zonomi",
+    baseUrl: "https://zonomi.com/app",
+    auth: { type: "query", queryKey: "api_key", cfgField: "token" },
+    list: { path: (z) => `/dns/query.jsp?name=${z}`, recordsPath: ["zones", "0", "records"] },
+    fields: {
+      id: (r) => String(r.name ?? r.id ?? ""),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.content),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/dns/modify.jsp?name=${z}`,
+      body: (z, rec) => ({ action: "SET", type: rec.type, name: rec.name, content: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "POST",
+    },
+    update: {
+      path: (z) => `/dns/modify.jsp?name=${z}`,
+      body: (z, rec) => ({ action: "SET", type: rec.type, name: rec.name, content: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "POST",
+    },
+    delete: { path: (z, id) => `/dns/delete.jsp?name={id}`, method: "POST" },
+  },
+
+  // dnspark: /v2/domains/{zone}/records (rtype/rname/rdata)
+  {
+    name: "dnspark",
+    baseUrl: "https://api.dnspark.com/v2",
+    auth: { type: "bearer", cfgField: "token", env: "DDNS_DNSPARK_TOKEN" },
+    list: { path: (z) => `/domains/${z}/records`, recordsPath: ["records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.data ?? r.value),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/domains/${z}/records`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, data: rec.value, ttl: rec.ttl ?? 3600 }),
+      idPath: ["record", "id"],
+    },
+    update: {
+      path: (z, id) => `/domains/${z}/records/${id}`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, data: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "PATCH",
+    },
+    delete: { path: (z, id) => `/domains/${z}/records/${id}` },
+  },
+
+  // flexibleengine: /v2/zones/{zone}/recordsets (X-Auth-Token)
+  {
+    name: "flexibleengine",
+    baseUrl: "https://dns.prod-cloud-ocb.orange-business.com/v2",
+    auth: { type: "header", header: "X-Auth-Token", cfgField: "token", env: "DDNS_FLEXIBLEENGINE_TOKEN" },
+    list: { path: (z) => `/zones/${z}/recordsets`, recordsPath: ["recordsets"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String((r.records as string[] | undefined)?.[0] ?? ""),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/zones/${z}/recordsets`,
+      body: (z, rec) => ({ name: rec.name, type: rec.type, records: [rec.value], ttl: rec.ttl ?? 3600 }),
+      idPath: ["id"],
+    },
+    update: {
+      path: (z, id) => `/zones/${z}/recordsets/${id}`,
+      body: (z, rec) => ({ name: rec.name, type: rec.type, records: [rec.value], ttl: rec.ttl ?? 3600 }),
+      method: "PUT",
+    },
+    delete: { path: (z, id) => `/zones/${z}/recordsets/${id}` },
+  },
+
+  // conoha: /v1/domains/{zone}/records (data)
+  {
+    name: "conoha",
+    baseUrl: "https://dns-service.region.conoha.io/v1",
+    auth: { type: "bearer", cfgField: "token", env: "DDNS_CONOHA_TOKEN" },
+    list: { path: (z) => `/domains/${z}/records`, recordsPath: ["records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.data),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/domains/${z}/records`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, data: rec.value, ttl: rec.ttl ?? 3600 }),
+      idPath: ["id"],
+    },
+    update: {
+      path: (z, id) => `/domains/${z}/records/${id}`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, data: rec.value, ttl: rec.ttl ?? 3600 }),
+      method: "PUT",
+    },
+    delete: { path: (z, id) => `/domains/${z}/records/${id}` },
+  },
+
+  // sakuracloud: /cloud/1.1/zone/{zone}/record (X-Xack-API-Key: access:secret)
+  {
+    name: "sakuracloud",
+    idFromName: true,
+    baseUrl: "https://secure.sakura.ad.jp/cloud/zone/is1a/api/cloud/1.1",
+    auth: { type: "header", header: "X-Xack-API-Key", cfgField: "token", env: "DDNS_SAKURACLOUD_TOKEN" },
+    list: { path: (z) => `/zone/${z}/record`, recordsPath: ["CommonServiceItem", "Settings", "DNS", "ResourceRecordSets"] },
+    // (deep nesting handled by the mock's superset shape)
+    fields: {
+      id: (r) => String(r.Name ?? r.name ?? r.id ?? ""),
+      type: (r) => String(r.Type ?? r.type),
+      name: (r) => String(r.Name ?? r.name),
+      value: (r) => String(r.RData ?? r.content),
+      ttl: (r) => (r.TTL !== undefined ? Number(r.TTL) : r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/zone/${z}/record`,
+      body: (z, rec) => ({ CommonServiceItem: { Settings: { DNS: { ResourceRecordSets: [{ Name: rec.name, Type: rec.type, RData: rec.value, TTL: rec.ttl ?? 3600 }] } } } }),
+      method: "POST",
+    },
+    update: {
+      path: (z, id) => `/zone/${z}/record/${id}`,
+      body: (z, rec) => ({ CommonServiceItem: { Settings: { DNS: { ResourceRecordSets: [{ Name: rec.name, Type: rec.type, RData: rec.value, TTL: rec.ttl ?? 3600 }] } } } }),
+      method: "PUT",
+    },
+    delete: { path: (z, id) => `/zone/${z}/record/${id}` },
+  },
+];export const REST_SPEC_NAMES: string[] = REST_SPECS.map((s) => s.name);

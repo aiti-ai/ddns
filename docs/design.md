@@ -90,14 +90,18 @@ resolver 不走 NSS），但：
 - service-tunnels 集成：`beacon` API + tunnel url 事件联动（远端服务器无人值守
   注册当前 tunnel 域名的完整闭环）。
 
-## 7. 供应商全景（61 家，对齐 Go ddns-updater + lexicon）
+## 7. 供应商全景（77 家，对齐 Go ddns-updater 61 家 + lexicon 补充 16 家）
 
 | 类别 | 数量 | 实现 |
 |---|---|---|
 | 手写精装 | 6 | cloudflare / dnspod / aliyun / duckdns / custom / freedns |
-| REST zone API（spec 驱动） | 14 | digitalocean / gandi / godaddy / hostinger / ionos / linode / luadns / namecom / porkbun / scaleway / servercow / vultr / hetznercloud / bunny |
+| REST zone API（spec 驱动，Go 侧） | 14 | digitalocean / gandi / godaddy / hostinger / ionos / linode / luadns / namecom / porkbun / scaleway / servercow / vultr / hetznercloud / bunny |
 | dyndns2（spec 驱动） | 28 | allinkl … zoneedit（见 `dyndns-services.ts`） |
 | 特例 | 7 | dreamhost / dondominio / netcup / namesilo / spaceship / route53(SigV4) / gcp(OAuth) |
+| lexicon 补充（spec 驱动） | 16 | dnsimple / cloudns / glesys / regfish / internetbs / pointhq / rage4 / online / timeweb / zonomi / dnspark / flexibleengine / conoha / sakuracloud / dreamhost / dondominio |
 
-每家都有 mock（手写或 spec 通用）与契约测试；route53 的 SigV4 签名由 mock 侧
-行为验证，aliyun 的 HMAC 由 mock 验签。
+接口融合：lexicon 的 `(rtype, name, content)` 记录模型与 `ZoneProvider` 同构，
+其 REST 类 provider 直接进 RestSpec 框架（每家 ~15 行声明 + 自动 mock + 自动契约
+测试）；account 预查找（dnsimple）通过 `preLookups` 支持。每家都有 mock（手写或
+spec 通用）与契约测试；route53 的 SigV4 签名由 mock 侧行为验证，aliyun 的 HMAC
+由 mock 验签。

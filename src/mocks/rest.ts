@@ -48,6 +48,8 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
     return state.records.find(
       (r) =>
         r.id === a ||
+        // single {id} capture may address the record by name (zonomi)
+        (b === undefined && nameMatches(r.name)) ||
         // {name}/{type} template order (gandi)
         (b !== undefined && nameMatches(r.name) && r.type === b) ||
         // {type}/{name} template order (godaddy)
@@ -76,23 +78,42 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
       rrset_ttl: r.ttl ?? 300,
       rrset_domain: rest.join("."),
       domain: rest.join("."),
+      rrdata: r.value,
+      record: r.value, // cloudns-style string record
+      rdata: r.value,
+      records: [r.value], // flexibleengine recordsets style
+      // nested record object (pointhq style)
+      record_details: { id: r.id, record_type: r.type, name: r.name, data: r.value, ttl: r.ttl ?? 300 },
+      // sakuracloud deep nesting
+      CommonServiceItem: { Settings: { DNS: { ResourceRecordSets: [{ Name: r.name, Type: r.type, RData: r.value, TTL: r.ttl ?? 300 }] } } },
     };
   };
 
   /** Extract a standard record from a create/update body (any of the common
    *  field vocabularies; gandi-style name/type come from path captures). */
   const stdRec = (body: unknown, nameFromPath?: string, typeFromPath?: string): { type: string; name: string; value: string; ttl?: number } => {
-    const b = Array.isArray(body) ? (body[0] as Record<string, unknown> ?? {}) : (body as Record<string, unknown> ?? {});
-    const val = String(b.data ?? b.content ?? b.target ?? b.answer ?? b.value ?? (b.rrset_values as string[])?.[0] ?? "");
-    let name = nameFromPath ?? String(b.name ?? b.host ?? "");
+    let b = (Array.isArray(body) ? (body[0] as Record<string, unknown> ?? {}) : (body as Record<string, unknown> ?? {})) as Record<string, unknown>;
+    // sakuracloud nested CommonServiceItem.Settings.DNS.ResourceRecordSets
+    const nested = (b.CommonServiceItem as Record<string, unknown> | undefined)
+      ?.Settings as Record<string, unknown> | undefined;
+    const saku = ((nested?.DNS as Record<string, unknown> | undefined)?.ResourceRecordSets as Record<string, unknown>[] | undefined)?.[0];
+    if (saku) b = saku;
+    // b.record may be a string (cloudns) or a nested object (pointhq)
+    const recField = typeof b.record === "string" ? b.record : (b.record as Record<string, unknown> | undefined)?.data;
+    const val = String(
+      b.data ?? b.content ?? b.target ?? b.answer ?? b.value ?? b.Value ?? b.RData ??
+      recField ?? (b.records as string[])?.[0] ?? (b.rrset_values as string[])?.[0] ?? "",
+    );
+    let name = nameFromPath ?? String(b.name ?? b.host ?? b.Name ?? (b.record as Record<string, unknown> | undefined)?.name ?? "");
     // short names ("home", host-only) are joined with the mock's zone; "@"
     // (root) stays as-is; full fqdns pass through
     if (name && name !== "@" && !name.includes(".")) name = `${name}.${zone}`;
+    const recType = typeof b.record === "string" ? undefined : (b.record as Record<string, unknown> | undefined)?.record_type;
     return {
-      type: typeFromPath ?? String(b.type ?? ""),
+      type: typeFromPath ?? String(b.type ?? b.record_type ?? b.Type ?? recType ?? ""),
       name,
       value: val,
-      ttl: b.ttl !== undefined ? Number(b.ttl) : b.rrset_ttl !== undefined ? Number(b.rrset_ttl) : undefined,
+      ttl: b.ttl !== undefined ? Number(b.ttl) : b.TTL !== undefined ? Number(b.TTL) : b.rrset_ttl !== undefined ? Number(b.rrset_ttl) : undefined,
     };
   };
   const zoneId = randomUUID();
@@ -122,23 +143,50 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
       if (!authOk(req)) return json(res, 401, { error: "unauthorized" });
 
       const p = url.pathname;
+      const fullPath = url.pathname + url.search;
       const method = req.method ?? "GET";
       const stripQuery = (t: string) => t.split("?")[0]!;
       // regex matcher for path templates with {id}/{name}/{type} placeholders
       const pathRegex = (template: string): RegExp => {
-        const esc = template.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+        const esc = template.replace(/[.+^${}()|[\]?&\\]/g, "\\$&");
         const rx = esc.replace(/\\\{id\\\}/g, "([^/]+)").replace(/\\\{name\\\}/g, "([^/]+)").replace(/\\\{type\\\}/g, "([^/]+)");
         return new RegExp(`^${rx}$`);
       };
+      // match against pathname only (query dropped) — for templates carrying ?query
+      const querylessPathRegex = (template: string): RegExp => pathRegex(template.split("?")[0] ?? template);
+      // full-path match where {id} stops at ? or & (query-carrying templates);
+      // the tail is left open: providers may append auth query params
+      const queryTplRegex = (template: string): RegExp => {
+        const esc = template.replace(/[.+^${}()|[\]?&\\]/g, "\\$&");
+        const rx = esc
+          .replace(/\\\{id\\\}/g, "([^?&/]+)")
+          .replace(/\\\{name\\\}/g, "([^?&/]+)")
+          .replace(/\\\{type\\\}/g, "([^?&/]+)");
+        return new RegExp(`^${rx}(?:&.*)?$`);
+      };
 
-      // zone-id lookup endpoint (query-stripped compare)
+      // pre-lookups (dnsimple account etc.) — return a fake id array shape
+      for (const pl of spec.preLookups ?? []) {
+        if (p === stripQuery(pl.path())) {
+          return json(res, 200, [{ id: "acct1" }, { data: [{ id: "acct1" }] }]);
+        }
+      }
+
+      // zone-id lookup endpoint (query-stripped compare) — superset shape:
+      // zones[] / items[] / data[] / response.records[] all carry the id
       if (spec.zoneIdLookup && p === stripQuery(spec.zoneIdLookup.path(zone))) {
-        const wrapper = { zones: [{ id: zoneId, name: zone }], items: [{ id: zoneId, name: zone }], data: [{ id: zoneId, domain: zone }] };
+        const wrapper = {
+          zones: [{ id: zoneId, name: zone }],
+          items: [{ id: zoneId, name: zone }],
+          data: [{ id: zoneId, domain: zone }],
+          response: { records: [{ id: zoneId, domainname: zone }] },
+        };
         return json(res, 200, wrapper);
       }
 
       // list (query-stripped compare; empty recordsPath = bare array body)
-      if (method === "GET" && p === stripQuery(spec.list.path(zone, zoneId))) {
+      const listTpl = spec.list.path(zone, zoneId, "acct1");
+      if (method === "GET" && (p === stripQuery(spec.list.path(zone, zoneId)) || p === stripQuery(listTpl))) {
         const shaped = state.records.map(apiShape);
         if (spec.list.recordsPath.length === 0) return json(res, 200, shaped);
         const wrapped: Record<string, unknown> = {};
@@ -149,14 +197,26 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
 
       // create: matches POST to the collection path, or the create template
       // with {name}/{type} placeholders (gandi-style)
-      const createTemplate = spec.create.path(zone, zoneId, { name: "x", type: "A", value: "x" } as never);
+      const createTemplate = spec.create.path(zone, zoneId, { name: "x", type: "A", value: "x" } as never, "acct1");
       const createMatch = p === stripQuery(spec.list.path(zone, zoneId))
+        || p === stripQuery(spec.create.path(zone, zoneId, { name: "x", type: "A", value: "x" } as never))
+        || p === stripQuery(createTemplate)
         || pathRegex(createTemplate).test(p);
       if (method === (spec.create.method ?? "POST") && createMatch) {
         const cap = pathRegex(createTemplate).exec(p);
         const std = stdRec(parsed, cap?.[1], cap?.[2]);
-        const rec = { id: randomUUID(), type: std.type, name: std.name, value: std.value, ttl: std.ttl };
-        state.records.push(rec);
+        // idempotent SET-style APIs (zonomi modify.jsp): update in place when
+        // a record with the same name/type already exists
+        const existing = std.name
+          ? state.records.find((r) => r.name === std.name && r.type === std.type)
+          : undefined;
+        const rec = existing ?? { id: spec.idFromName ? std.name || randomUUID() : randomUUID(), type: std.type, name: std.name, value: std.value, ttl: std.ttl };
+        if (existing) {
+          rec.value = std.value;
+          if (std.ttl !== undefined) rec.ttl = std.ttl;
+        } else {
+          state.records.push(rec);
+        }
         const shaped = apiShape(rec);
         const wrapped: Record<string, unknown> = { id: rec.id, record: shaped, domain_record: shaped };
         if (spec.create.idPath) setPath(wrapped, spec.create.idPath, rec.id);
@@ -164,7 +224,19 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
       }
 
       // update / delete: match the spec's path templates against the request
-      const updateMatch = pathRegex(spec.update.path(zone, "{id}", zoneId)).exec(p);
+      const updateTpl = spec.update.path(zone, "{id}", zoneId, "acct1");
+      // pathname match first (query-carrying templates use queryless form);
+      // fullPath only when the template itself contains a query we must see
+      // (there {id} must not eat ? or &)
+      const qlMatch = querylessPathRegex(updateTpl).exec(p);
+      const qtMatch = updateTpl.includes("?") ? queryTplRegex(updateTpl).exec(fullPath) : null;
+      // id-less templates (zonomi modify.jsp): match by body name/type
+      const bodyMatch = (qlMatch && qlMatch[1] === undefined && !qtMatch)
+        ? { 1: stdRec(parsed).name } as unknown as RegExpExecArray
+        : null;
+      const updateMatch = (qlMatch && qlMatch[1] !== undefined ? qlMatch : null)
+        ?? qtMatch
+        ?? bodyMatch;
       if (method === (spec.update.method ?? "PUT") && updateMatch) {
         const rec = findRec(updateMatch);
         if (!rec) return json(res, 404, { error: "not found" });
@@ -175,7 +247,11 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
         if (std.ttl !== undefined) rec.ttl = std.ttl;
         return json(res, 200, apiShape(rec));
       }
-      const deleteMatch = pathRegex(spec.delete.path(zone, "{id}", zoneId)).exec(p);
+      const deleteTpl = spec.delete.path(zone, "{id}", zoneId, "acct1");
+      const dqMatch = querylessPathRegex(deleteTpl).exec(p);
+      const deleteMatch = (dqMatch && dqMatch[1] !== undefined ? dqMatch : null)
+        ?? (deleteTpl.includes("?") ? queryTplRegex(deleteTpl).exec(fullPath) : null)
+        ?? (method === (spec.delete.method ?? "DELETE") && dqMatch ? { 1: stdRec(parsed).name } as unknown as RegExpExecArray : null);
       if (method === (spec.delete.method ?? "DELETE") && deleteMatch) {
         const idx = state.records.findIndex((r) => r.id === findRec(deleteMatch)?.id);
         if (idx < 0) return json(res, 404, { error: "not found" });
