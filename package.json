@@ -1,0 +1,52 @@
+{
+  "name": "ddns",
+  "version": "0.1.0",
+  "description": "DDNS + DNS record management, multi-provider. Merges ddns-updater (Go) record-value updates with lexicon (Python) arbitrary record CRUD — every provider ships a mock implementation so the full flow is testable offline.",
+  "type": "module",
+  "bin": {
+    "ddns": "./dist/cli.js",
+    "ddns-cli": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./src/*.ts": "./src/*.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "docs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-force-exit \"test/**/*.test.mjs\""
+  },
+  "keywords": [
+    "ddns",
+    "dynamic-dns",
+    "dns",
+    "cloudflare",
+    "dnspod",
+    "aliyun",
+    "alidns",
+    "duckdns",
+    "webhook",
+    "dns-record",
+    "dns-updater",
+    "cname",
+    "txt"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^5.8.3"
+  }
+}

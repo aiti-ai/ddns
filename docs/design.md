@@ -1,0 +1,87 @@
+# ddns 设计文档
+
+本包合并两家成熟项目的能力，并以「它们的实现对着我们的 mock 也能过」为验收标准。
+
+## 1. 能力对照
+
+| 能力 | ddns-updater (Go) | lexicon (Python) | 本项目 (TS) |
+|---|---|---|---|
+| 记录值跟随公网 IP（A/AAAA） | ✅ 核心 | ❌（只做证书挑战外的通用 CRUD） | ✅ `engine.ts` |
+| 变化才推送（up-to-date 跳过） | ✅ | — | ✅（list 比对） |
+| 任意记录 CRUD（CNAME/TXT/MX） | ❌（Update 只收 IP） | ✅ 核心 | ✅ `client.ts` |
+| upsert（无则建、有则改） | ✅（create 当缺失） | ✅（--if-* 选项） | ✅ |
+| push 型供应商（duckdns/custom webhook） | ✅ | ✅ duckdns | ✅ |
+| 签名 API（aliyun） | ✅ HMAC-SHA1 | ❌ 无 aliyun | ✅（mock 验签） |
+| provider 统一抽象 | `Update(ctx, client, ip)` | `list/create/update/delete_record` | 双风格：`ZoneProvider` + `PushProvider` |
+| 长跑循环 | ✅ 定时器 | ❌（CLI 单次） | ✅ `startLoop`（unref 定时器） |
+
+## 2. 架构
+
+```
+src/
+├── types.ts        # DnsRecord / ZoneProvider / PushProvider / ProviderConfig
+├── ip.ts           # 公网 IP 探测（ipify → icanhazip 双源容错，Go publicip 语义）
+├── client.ts       # lexicon 式 CRUD + createProvider 注册表 + upsert
+├── engine.ts       # Go 式 DDNS：detect → compare → push；runOnce / startLoop
+├── config.ts       # ddns.json（0600，原子写）
+├── cli.ts          # 命令：ip / mock / list / create / update / delete / sync / config
+├── providers/      # 5 家实现（注入 fetch + baseUrl，可测）
+│   └── common.ts   # ProviderError / splitZone / formEncode
+└── mocks/          # ★ 每供应商一个 mock（真实 HTTP 形状）+ TLS 代理面
+    ├── cloudflare.ts   # REST v4：zones?name=、dns_records CRUD、Bearer 校验
+    ├── dnspod.ts       # dnsapi.cn：Domain.Info / Record.List/Create/Modify/Remove
+    ├── aliyun.ts       # RPC：Describe/Add/Update/Delete，验签（错签拒绝）
+    ├── duckdns.ts      # /update 任意路径 OK/KO（Go 打 /update、lexicon 打 /、我们打 /v3/update）
+    ├── custom.ts       # 任意 webhook URL，可配响应体（success_regex 测试）
+    ├── tls.ts          # TLS 面 + CONNECT 代理面（内置自签 CA）
+    └── assets/         # mock-ca.pem + mock-server.pem（SAN 覆盖四家域名）
+```
+
+## 3. mock 的「他们能过」保证（契约）
+
+每个 mock 都按**真实 API 的形状**实现，并针对两家实现的具体行为校准：
+
+| mock | 为兼容 Go 的细节 | 为兼容 lexicon 的细节 |
+|---|---|---|
+| cloudflare | 列表查询容忍 `page`/`per_page` 参数；`/zones?name=` | `/zones` 响应带 `result_info.total_pages`（authenticate 分页循环读它） |
+| dnspod | `Record.List/Modify` 用 `record_id`；表单 `login_token` | 先调 `POST /Domain.Info` 认证（返回 `domain.id`、`status.code=="1"`） |
+| aliyun | `DescribeDomainRecords` + `PageSize`、`DomainRecords.Record[]` 响应；**验签**（给 secret 时错签直接拒） | lexicon 无此供应商 |
+| duckdns | 请求路径 `/update` | 请求路径 `/` —— mock **忽略路径**统一响应 |
+| custom | URL 追加 `&ipv4=/&ipv6=`、`success_regex` 判定 | — |
+
+## 4. TLS 代理面（静态编译 Go 二进制怎么连 mock）
+
+Go 的 provider 把 `api.cloudflare.com` 等域名硬编码，配置无 base URL 注入点。
+对静态编译（CGO_ENABLED=0）的二进制，LD_PRELOAD 劫持 getaddrinfo 无效（纯 Go
+resolver 不走 NSS），但：
+
+1. Go `net/http` **原生读 `HTTPS_PROXY`**（`ProxyFromEnvironment`）；
+2. Go `crypto/x509` **原生读 `SSL_CERT_FILE`**。
+
+所以 `src/mocks/tls.ts` 提供：
+
+```
+客户端 ──HTTPS_PROXY=proxyUrl──► CONNECT api.cloudflare.com:443 → 200
+        → TLS（SNI=api.cloudflare.com，证书 SAN 覆盖，CA 由 SSL_CERT_FILE 注入）
+        → 桥接到 TLS 面 → 转发 mock 明文 HTTP 面
+```
+
+- 无 root（不碰 443/hosts）、无 preload，只设两个标准环境变量；
+- 内置 CA/服务端证书在 `src/mocks/assets/`（10 年有效期，仅测试用）；
+- Python lexicon（requests）同样认 `HTTPS_PROXY` + `REQUESTS_CA_BUNDLE`。
+
+## 5. 测试矩阵（18 用例，全离线）
+
+| 文件 | 覆盖 | 对齐 |
+|---|---|---|
+| `test/providers.test.mjs` | 5 家 provider 对自家 mock 的 CRUD/推送/错误 | Go + lexicon 请求形状 |
+| `test/engine.test.mjs` | DDNS 语义（create/update/unchanged/disabled/no-ip）、loop、upsert、config 0600、IP 探测容错 | Go update 循环 |
+| `test/cli.test.mjs` | CLI 端到端（spawn cli.ts）对 mock | — |
+| `test/tls-proxy.test.mjs` | CONNECT→TLS→HTTP 全流程（模拟 Go 客户端）、直接 TLS 面、POST 透传 | Go net/http 行为 |
+
+## 6. 后续（未做）
+
+- 更多供应商（route53 / godaddy / freedns / namecheap…）——接口已就位，按
+  `providers/<name>/index.ts` 模式添加即可；
+- `--tls-proxy` 下 lexicon 的 `api_endpoint` 实例属性覆盖用法文档；
+- 服务端进程模式（`ddns serve`，常驻循环 + 状态查询 API，对齐 ddns-updater WebUI）。

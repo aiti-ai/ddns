@@ -1,0 +1,86 @@
+/** ddns — DDNS + DNS record management, multi-provider.
+ *
+ *  Merges the capabilities of:
+ *   - ddns-updater (Go, qdm12/ddns-updater): record-value updates driven by
+ *     public-IP detection (A/AAAA), push-style providers (duckdns, custom
+ *     webhook), long-running update loop;
+ *   - lexicon (Python, dns-lexicon): arbitrary record CRUD (A/AAAA/CNAME/
+ *     TXT/MX…) against zone-style provider APIs (cloudflare, dnspod, aliyun).
+ *
+ *  Every provider ships an in-memory mock (src/mocks) that mirrors the real
+ *  provider HTTP API closely enough for third-party implementations (Go
+ *  ddns-updater, Python lexicon) pointed at it to work too — including a
+ *  TLS + CONNECT proxy face (src/mocks/tls.ts) for statically-linked Go
+ *  binaries that hardcode provider hostnames.
+ */
+
+export type {
+  RecordType,
+  DnsRecord,
+  ListFilter,
+  ProviderName,
+  ProviderMeta,
+  ZoneProvider,
+  PushProvider,
+  DnsProvider,
+  ProviderConfig,
+  FetchLike,
+} from "./types.ts";
+
+export { resolvePublicIp, isValidIp, IPV4_SOURCES, IPV6_SOURCES } from "./ip.ts";
+
+export { ProviderError, splitZone, formEncode, defaultFetch } from "./providers/common.ts";
+
+export { createProvider, isPushProvider, isZoneProvider, listRecords, createRecord, updateRecord, deleteRecord, deleteRecordByName, upsertRecord } from "./client.ts";
+
+export {
+  aliyunCanonicalQuery,
+  aliyunStringToSign,
+  aliyunSign,
+  aliyunPercent,
+  CloudflareProvider,
+  DnspodProvider,
+  AliyunProvider,
+  DuckdnsProvider,
+  CustomProvider,
+} from "./providers/index.ts";
+
+export type { DdnsEntry, DdnsResult, DdnsDeps, DdnsLoopHandle } from "./engine.ts";
+export { updateEntry, runOnce, startLoop } from "./engine.ts";
+
+export { configPath, readConfig, writeConfig } from "./config.ts";
+
+// -- mocks (each provider has one; TLS proxy face included) --
+export {
+  startCloudflareMock,
+  startDnspodMock,
+  startAliyunMock,
+  startDuckdnsMock,
+  startCustomMock,
+  startMockProvider,
+  startAllMocks,
+  startTlsProxy,
+  caCertPath,
+  serverCertPath,
+} from "./mocks/index.ts";
+export type {
+  CloudflareMockHandle,
+  CloudflareMockOptions,
+  CloudflareMockState,
+  DnspodMockHandle,
+  DnspodMockOptions,
+  DnspodMockState,
+  AliyunMockHandle,
+  AliyunMockOptions,
+  AliyunMockState,
+  DuckdnsMockHandle,
+  DuckdnsMockOptions,
+  DuckdnsMockState,
+  CustomMockHandle,
+  CustomMockOptions,
+  CustomMockState,
+  MockProviderName,
+  MockOptionsMap,
+  AllMocksHandle,
+} from "./mocks/index.ts";
+export type { TlsProxyHandle } from "./mocks/tls.ts";
