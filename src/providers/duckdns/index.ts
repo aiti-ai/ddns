@@ -20,6 +20,7 @@ export class DuckdnsProvider implements PushProvider {
     recordTypes: ["A", "AAAA"],
     needsZone: false,
     authFields: ["token (duckdns token)"],
+    params: [],
   } as const;
 
   readonly #token: string;

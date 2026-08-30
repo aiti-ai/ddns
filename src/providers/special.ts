@@ -24,7 +24,8 @@ const defaultFetchImpl: FetchLike = (url, init) =>
 
 /** dreamhost: GET https://api.dreamhost.com/?key=..&unique_id=..&format=json&cmd=.. */
 export class DreamhostProvider implements ZoneProvider {
-  readonly meta = { name: "dreamhost", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (API key)"] } as const;
+  readonly meta = { name: "dreamhost", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (API key)"],
+    params: [] } as const;
   readonly #key: string;
   readonly #base: string;
   readonly #fetch: FetchLike;
@@ -75,7 +76,8 @@ export class DreamhostProvider implements ZoneProvider {
 
 /** dondominio: GET https://dondns.dondominio.com/json/?user&password&host&ip&lang */
 export class DondominioProvider implements PushProvider {
-  readonly meta = { name: "dondominio", style: "push", recordTypes: ["A", "AAAA"], needsZone: false, authFields: ["username", "password"] } as const;
+  readonly meta = { name: "dondominio", style: "push", recordTypes: ["A", "AAAA"], needsZone: false, authFields: ["username", "password"],
+    params: [] } as const;
   readonly #user: string;
   readonly #password: string;
   readonly #base: string;
@@ -113,7 +115,8 @@ interface NetcupRecord {
 }
 
 export class NetcupProvider implements ZoneProvider {
-  readonly meta = { name: "netcup", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (API key)", "secret (API password)", "username (customer number)"] } as const;
+  readonly meta = { name: "netcup", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (API key)", "secret (API password)", "username (customer number)"],
+    params: [] } as const;
   readonly #customer: string;
   readonly #apiKey: string;
   readonly #apiPassword: string;
@@ -209,7 +212,8 @@ export class NetcupProvider implements ZoneProvider {
 
 /** namesilo: GET https://www.namesilo.com/api/<cmd>?version=1&type=json&key=..&domain=.. */
 export class NamesiloProvider implements ZoneProvider {
-  readonly meta = { name: "namesilo", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (API key)"] } as const;
+  readonly meta = { name: "namesilo", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (API key)"],
+    params: [] } as const;
   readonly #key: string;
   readonly #base: string;
   readonly #fetch: FetchLike;
@@ -265,7 +269,8 @@ export class NamesiloProvider implements ZoneProvider {
 
 /** spaceship: REST https://api.spaceship.dev/ with X-API-Key + X-API-Secret. */
 export class SpaceshipProvider implements ZoneProvider {
-  readonly meta = { name: "spaceship", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (API key)", "secret (API secret)"] } as const;
+  readonly meta = { name: "spaceship", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (API key)", "secret (API secret)"],
+    params: [] } as const;
   readonly #key: string;
   readonly #secret: string;
   readonly #base: string;

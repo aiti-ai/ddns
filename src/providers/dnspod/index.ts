@@ -35,6 +35,7 @@ export class DnspodProvider implements ZoneProvider {
     recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX", "NS"],
     needsZone: true,
     authFields: ["token (login_token '<id>,<token>')"],
+    params: [],
   } as const;
 
   readonly #token: string;

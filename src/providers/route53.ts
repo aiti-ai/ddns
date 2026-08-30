@@ -69,7 +69,8 @@ interface R53Record {
 }
 
 export class Route53Provider implements ZoneProvider {
-  readonly meta = { name: "route53", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (AccessKeyId)", "secret (SecretAccessKey)"] } as const;
+  readonly meta = { name: "route53", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (AccessKeyId)", "secret (SecretAccessKey)"],
+    params: [] } as const;
   readonly #accessKey: string;
   readonly #secretKey: string;
   readonly #zoneId: string;

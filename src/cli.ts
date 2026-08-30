@@ -33,6 +33,7 @@ function usage(): void {
   ddns sync [--config <file>] [--once] [--loop] [--interval <sec>]
                                             # DDNS: point every entry at the current public IP
   ddns serve [--config <file>] [--port <p>]  # loop + status API (GET /status, POST /update)
+  ddns providers [name]                   # provider list, or one provider's parameter schema
   ddns config path | show [--config <file>]
 
   creds: --token <t> | --secret <s> | --access-key-id <k> | --zone-id <zid> |
@@ -264,6 +265,21 @@ async function main(): Promise<void> {
       process.on("SIGINT", async () => { await handle.stop(); process.exit(0); });
       process.on("SIGTERM", async () => { await handle.stop(); process.exit(0); });
       await new Promise(() => {});
+      break;
+    }
+
+    case "providers": {
+      const { providerMetas, providerMeta } = await import("./schemas.ts");
+      if (cmd[1]) {
+        const meta = providerMeta(cmd[1]);
+        if (!meta) {
+          console.error(`unknown provider: ${cmd[1]} — see 'ddns providers'`);
+          process.exit(2);
+        }
+        out(meta);
+      } else {
+        out(providerMetas());
+      }
       break;
     }
 

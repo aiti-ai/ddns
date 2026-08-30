@@ -53,6 +53,7 @@ export class AliyunProvider implements ZoneProvider {
     recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX", "NS"],
     needsZone: true,
     authFields: ["accessKeyId (AccessKeyId)", "secret (AccessKeySecret)"],
+    params: [],
   } as const;
 
   readonly #keyId: string;

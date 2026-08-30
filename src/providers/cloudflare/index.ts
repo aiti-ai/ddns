@@ -37,6 +37,7 @@ export class CloudflareProvider implements ZoneProvider {
     recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX", "NS"],
     needsZone: true,
     authFields: ["token (API token)", "zoneId (optional)"],
+    params: [],
   } as const;
 
   readonly #token: string;

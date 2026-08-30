@@ -33,6 +33,23 @@ export interface ListFilter {
 /** Provider names (built-in set; custom registry entries are strings too). */
 export type ProviderName = "cloudflare" | "dnspod" | "aliyun" | "duckdns" | "custom" | (string & {});
 
+/** Parameter definition (same shape as service-tunnels ParamSpec — hosts
+ *  can render forms / validate from this). */
+export interface ParamSpec {
+  /** Config key (ProviderConfig field). */
+  key: string;
+  /** Display label (default: key). */
+  label?: string;
+  type?: "string" | "number" | "boolean" | "password";
+  description?: string;
+  /** Docs / setup link. */
+  link?: string;
+  default?: string | number | boolean;
+  placeholder?: string;
+  required?: boolean;
+  options?: Array<{ value: string; label?: string }>;
+}
+
 export interface ProviderMeta {
   name: ProviderName;
   /** Style: "zone" = full record CRUD against a zone API (lexicon model);
@@ -45,6 +62,8 @@ export interface ProviderMeta {
   needsZone: boolean;
   /** Human-readable auth field hints, e.g. ["token (API token)", "email"]. */
   authFields: readonly string[];
+  /** Full parameter schema (auth + entry + zone params). */
+  params: readonly ParamSpec[];
 }
 
 /** Zone-style provider: full record CRUD (lexicon's Provider interface). */

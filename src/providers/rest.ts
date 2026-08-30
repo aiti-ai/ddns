@@ -11,7 +11,7 @@
  *  The Go source for each service was checked to extract these shapes.
  */
 
-import type { DnsRecord, FetchLike, ListFilter, ProviderConfig, ZoneProvider } from "../types.ts";
+import type { DnsRecord, FetchLike, ListFilter, ParamSpec, ProviderConfig, ZoneProvider } from "../types.ts";
 import { ProviderError } from "./common.ts";
 
 export interface RestAuth {
@@ -29,6 +29,12 @@ export interface RestAuth {
 export interface RestSpec {
   name: string;
   baseUrl: string;
+  /** Default zone-style; set "push" for value-only REST APIs. */
+  style?: "zone" | "push";
+  /** Record types (default A/AAAA/CNAME/TXT/MX/NS). */
+  recordTypes?: string[];
+  /** Needs a root zone (default true). */
+  needsZone?: boolean;
   auth: RestAuth;
   /** Whether the API needs a zone-id lookup (hostinger/ionos/luadns/linode
    *  resolve zone name → numeric id first). */
@@ -85,7 +91,7 @@ export interface RestSpec {
 }
 
 export class RestProvider implements ZoneProvider {
-  readonly meta: { name: string; style: "zone"; recordTypes: string[]; needsZone: true; authFields: string[] };
+  readonly meta: { name: string; style: "zone"; recordTypes: string[]; needsZone: true; authFields: string[]; params: readonly ParamSpec[] };
 
   readonly #spec: RestSpec;
   readonly #cred: string;
@@ -107,6 +113,7 @@ export class RestProvider implements ZoneProvider {
       recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX", "NS"],
       needsZone: true,
       authFields: [spec.auth.cfgField],
+      params: [],
     };
   }
 

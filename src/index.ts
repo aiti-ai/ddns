@@ -68,6 +68,8 @@ export { startServe } from "./serve.ts";
 
 export { configPath, readConfig, writeConfig } from "./config.ts";
 
+export { providerSchema, providerMetas, providerMeta } from "./schemas.ts";
+
 // -- mocks (each provider has one; TLS proxy face included) --
 export {
   startCloudflareMock,

@@ -2,7 +2,7 @@
 
 本文档是 ddns 的对外接口契约。**修改接口时必须同步更新本文档。**
 
-版本：0.1.0 ｜ 77 家 provider ｜ 88 测试全绿
+版本：0.1.0 ｜ 69 家 provider ｜ 97 测试全绿
 
 ---
 
@@ -226,7 +226,28 @@ ddns mock [provider] [--port p] [--tls-proxy] [--zone z]
 
 ---
 
-## 3. 供应商清单（77 家）
+## 3. 供应商参数 schema
+
+每个 provider 的参数定义可用结构化查询（同 service-tunnels ParamSpec 形状，
+宿主可据此渲染表单/校验输入）：
+
+```ts
+providerMetas(): ProviderMeta[]        // 全部：{name, style, recordTypes, needsZone, params}
+providerMeta(name): ProviderMeta | undefined
+providerSchema(name): ParamSpec[]      // 单家参数
+// ParamSpec: { key, label?, type?: string|number|boolean|password,
+//              description?, link?, default?, placeholder?, required?, options? }
+```
+
+CLI：`ddns providers`（全部）/ `ddns providers <name>`（单家）。
+
+每家参数组成：通用条目参数（`name`/`record`/`type`/`ttl`）+ zone 参数（`zone`，
+push 型无）+ 各家认证参数（token/secret/username/password/accessKeyId/zoneId/
+url/ipv4key/ipv6key/successRegex，按 provider 声明，含 required/type/link 说明）。
+
+---
+
+## 4. 供应商清单（69 家唯一名）
 
 | 类别 | provider 名 |
 |---|---|
@@ -234,7 +255,7 @@ ddns mock [provider] [--port p] [--tls-proxy] [--zone z]
 | REST zone API（Go 侧） | digitalocean · gandi · godaddy · hostinger · ionos · linode · luadns · namecom · porkbun · scaleway · servercow · vultr · hetznercloud · bunny |
 | dyndns2 | allinkl · changeip · dd24 · ddnss · dnsomatic · dyn · dynu · dynv6 · easydns · gigahostno · goip · he · infomaniak · inwx · ipv64 · loopia · myaddr · namecheap · njalla · noip · nowdns · opendns · ovh · selfhostde · spdyn · strato · variomedia · zoneedit |
 | 特例 | dreamhost · dondominio · netcup · namesilo · spaceship · route53(SigV4) · gcp(OAuth) |
-| lexicon 补充 | dnsimple · cloudns · glesys · regfish · internetbs · pointhq · rage4 · online · timeweb · zonomi · dnspark · flexibleengine · conoha · sakuracloud |
+| lexicon 补充 | dnsimple · cloudns · glesys · regfish · internetbs · pointhq · rage4 · online · timeweb · zonomi · dnspark · flexibleengine · conoha · sakuracloud（dreamhost/dondominio 与特例共享） |
 
 环境变量约定：`DDNS_<PROVIDER_UPPER>_TOKEN` / `_SECRET` / `_ACCESS_KEY_ID` / `_USERNAME` / `_PASSWORD` 等（如 `DDNS_CLOUDFLARE_TOKEN`、`DDNS_ALIYUN_ACCESS_KEY_SECRET`）。
 

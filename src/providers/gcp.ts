@@ -25,7 +25,8 @@ interface GcpRrset {
 }
 
 export class GcpProvider implements ZoneProvider {
-  readonly meta = { name: "gcp", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (OAuth access token)", "username (project)", "password (managed zone)"] } as const;
+  readonly meta = { name: "gcp", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (OAuth access token)", "username (project)", "password (managed zone)"],
+    params: [] } as const;
   readonly #project: string;
   readonly #zone: string;
   readonly #token: string;

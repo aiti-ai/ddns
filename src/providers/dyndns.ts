@@ -3,7 +3,7 @@
  *  GET https://<host>/<path>?hostname=<record>&myip=<ip> with basic auth;
  *  response body decides success). One config per service below. */
 
-import type { FetchLike, ProviderConfig, PushProvider } from "../types.ts";
+import type { FetchLike, ParamSpec, ProviderConfig, PushProvider } from "../types.ts";
 import { ProviderError } from "./common.ts";
 
 export interface DyndnsSpec {
@@ -32,7 +32,7 @@ export const DYNDNS2_SPEC: Omit<DyndnsSpec, "name" | "url" | "userField"> = {
 };
 
 export class DyndnsProvider implements PushProvider {
-  readonly meta: { name: string; style: "push"; recordTypes: ["A", "AAAA"]; needsZone: false; authFields: string[] };
+  readonly meta: { name: string; style: "push"; recordTypes: ["A", "AAAA"]; needsZone: false; authFields: string[]; params: readonly ParamSpec[] };
 
   readonly #spec: DyndnsSpec;
   readonly #username: string;
@@ -57,6 +57,7 @@ export class DyndnsProvider implements PushProvider {
       recordTypes: ["A", "AAAA"],
       needsZone: false,
       authFields: spec.tokenOnly ? ["token"] : ["username", "password"],
+      params: [],
     };
   }
 

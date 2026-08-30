@@ -24,6 +24,7 @@ export class FreednsProvider implements PushProvider {
     recordTypes: ["A", "AAAA"],
     needsZone: false,
     authFields: ["token (record update token)"],
+    params: [],
   } as const;
 
   readonly #token: string;

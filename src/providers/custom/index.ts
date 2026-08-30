@@ -23,6 +23,7 @@ export class CustomProvider implements PushProvider {
     recordTypes: ["A", "AAAA"],
     needsZone: false,
     authFields: ["url (update endpoint)", "ipv4key", "ipv6key", "successRegex"],
+    params: [],
   } as const;
 
   readonly #url: string;
