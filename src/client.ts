@@ -9,6 +9,10 @@ import { createAliyun } from "./providers/aliyun/index.ts";
 import { createDuckdns } from "./providers/duckdns/index.ts";
 import { createCustom } from "./providers/custom/index.ts";
 import { createFreedns } from "./providers/freedns/index.ts";
+import { RestProvider } from "./providers/rest.ts";
+import { REST_SPECS } from "./providers/rest-specs.ts";
+import { DyndnsProvider } from "./providers/dyndns.ts";
+import { DYNDNS_SERVICES } from "./providers/dyndns-services.ts";
 
 export type ProviderLike = DnsProvider;
 
@@ -30,8 +34,18 @@ export function createProvider(cfg: ProviderConfig): DnsProvider {
     case "duckdns": return createDuckdns(cfg);
     case "custom": return createCustom(cfg);
     case "freedns": return createFreedns(cfg);
-    default:
+    default: {
+      // data-driven providers: rest specs + dyndns2 services
+      const rest = REST_SPECS.find((s) => s.name === cfg.provider);
+      if (rest) return new RestProvider(rest, cfg);
+      const dyn = DYNDNS_SERVICES.find((s) => s.name === cfg.provider);
+      if (dyn) {
+        const username = cfg.username ?? (dyn.tokenOnly ? "" : (cfg.token ?? process.env[`DDNS_${dyn.name.toUpperCase()}_USERNAME`] ?? ""));
+        const password = cfg.password ?? cfg.token ?? process.env[`DDNS_${dyn.name.toUpperCase()}_PASSWORD`] ?? "";
+        return new DyndnsProvider(dyn, { username, password, baseUrl: cfg.baseUrl });
+      }
       throw new Error(`unknown provider: ${cfg.provider}`);
+    }
   }
 }
 

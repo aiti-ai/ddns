@@ -93,6 +93,8 @@ LD_PRELOAD。详见 `docs/design.md`。
 | duckdns | push（GET update） | token | A/AAAA | `src/mocks/duckdns.ts`（OK/KO） |
 | custom | push（webhook） | URL + successRegex | A/AAAA | `src/mocks/custom.ts` |
 | freedns | push（afraid.org） | token | A/AAAA | `src/mocks/freedns.ts`（响应文本判定） |
+| **14 家 REST zone API** | digitalocean / gandi / godaddy / hostinger / ionos / linode / luadns / namecom / porkbun / scaleway / servercow / vultr / hetznercloud / bunny | Bearer/API-Key/Basic（按各家） | 同上 | `src/mocks/rest.ts`（spec 驱动） |
+| **28 家 dyndns2** | allinkl / changeip / dd24 / ddnss / dnsomatic / dyn / dynu / dynv6 / easydns / gigahostno / goip / he / infomaniak / inwx / ipv64 / loopia / myaddr / namecheap / njalla / noip / nowdns / opendns / ovh / selfhostde / spdyn / strato / variomedia / zoneedit | basic auth / token | A/AAAA | `src/mocks/dyndns.ts`（spec 驱动） |
 
 凭据也支持环境变量：`DDNS_CLOUDFLARE_TOKEN`、`DDNS_DNSPOD_TOKEN`、
 `DDNS_ALIYUN_ACCESS_KEY_ID` / `DDNS_ALIYUN_ACCESS_KEY_SECRET`、`DDNS_DUCKDNS_TOKEN`。

@@ -14,7 +14,7 @@
  *  startMockProvider(name, opts), or all of them with startAllMocks().
  */
 
-export type MockProviderName = "cloudflare" | "dnspod" | "aliyun" | "duckdns" | "custom" | "freedns";
+export type MockProviderName = string; // any registered provider name (spec-driven mocks included)
 
 import { startCloudflareMock, type CloudflareMockHandle, type CloudflareMockOptions } from "./cloudflare.ts";
 import { startDnspodMock, type DnspodMockHandle, type DnspodMockOptions } from "./dnspod.ts";
@@ -22,8 +22,10 @@ import { startAliyunMock, type AliyunMockHandle, type AliyunMockOptions } from "
 import { startDuckdnsMock, type DuckdnsMockHandle, type DuckdnsMockOptions } from "./duckdns.ts";
 import { startCustomMock, type CustomMockHandle, type CustomMockOptions } from "./custom.ts";
 import { startFreednsMock, type FreednsMockHandle, type FreednsMockOptions } from "./freedns.ts";
+import { startRestMock, type RestMockHandle, type RestMockOptions } from "./rest.ts";
+import { startDyndnsMock, type DyndnsMockHandle, type DyndnsMockOptions } from "./dyndns.ts";
 
-export type AnyMockHandle = CloudflareMockHandle | DnspodMockHandle | AliyunMockHandle | DuckdnsMockHandle | CustomMockHandle | FreednsMockHandle;
+export type AnyMockHandle = CloudflareMockHandle | DnspodMockHandle | AliyunMockHandle | DuckdnsMockHandle | CustomMockHandle | FreednsMockHandle | RestMockHandle | DyndnsMockHandle;
 
 export type MockOptionsMap = {
   cloudflare: CloudflareMockOptions;
@@ -34,15 +36,27 @@ export type MockOptionsMap = {
   freedns: FreednsMockOptions;
 };
 
-export async function startMockProvider<N extends MockProviderName>(name: N, opts: MockOptionsMap[N] = {} as MockOptionsMap[N]): Promise<AnyMockHandle> {
+/** Start a mock for ANY registered provider name (rest specs + dyndns
+ *  services get their generic mocks automatically). */
+export async function startMockFor(name: string, opts: { zone?: string; cred?: string; records?: Array<{ type: string; name: string; value: string; ttl?: number }>; port?: number } = {}): Promise<AnyMockHandle> {
+  const { REST_SPECS } = await import("../providers/rest-specs.ts");
+  const { DYNDNS_SERVICES } = await import("../providers/dyndns-services.ts");
+  const rest = REST_SPECS.find((s) => s.name === name);
+  if (rest) return startRestMock({ spec: rest, zone: opts.zone ?? "example.com", cred: opts.cred, records: opts.records, port: opts.port });
+  const dyn = DYNDNS_SERVICES.find((s) => s.name === name);
+  if (dyn) return startDyndnsMock({ auth: dyn.tokenOnly ? undefined : "user:pass", okText: "good", port: opts.port });
+  throw new Error(`unknown provider for mock: ${name}`);
+}
+
+export async function startMockProvider(name: MockProviderName, opts: Record<string, unknown> = {}): Promise<AnyMockHandle> {
   switch (name) {
     case "cloudflare": return startCloudflareMock(opts as CloudflareMockOptions);
     case "dnspod": return startDnspodMock(opts as DnspodMockOptions);
-    case "aliyun": return startAliyunMock(opts as AliyunMockOptions);
+    case "aliyun": return startAliyunMock(opts as unknown as AliyunMockOptions);
     case "duckdns": return startDuckdnsMock(opts as DuckdnsMockOptions);
     case "custom": return startCustomMock(opts as CustomMockOptions);
     case "freedns": return startFreednsMock(opts as FreednsMockOptions);
-    default: throw new Error(`unknown mock provider: ${name}`);
+    default: return startMockFor(name, opts as { zone?: string; cred?: string });
   }
 }
 
@@ -75,6 +89,8 @@ export { startAliyunMock } from "./aliyun.ts";
 export { startDuckdnsMock } from "./duckdns.ts";
 export { startCustomMock } from "./custom.ts";
 export { startFreednsMock } from "./freedns.ts";
+export { startRestMock } from "./rest.ts";
+export { startDyndnsMock } from "./dyndns.ts";
 export { startTlsProxy, caCertPath, serverCertPath } from "./tls.ts";
 
 export type { CloudflareMockHandle, CloudflareMockOptions, CloudflareMockState } from "./cloudflare.ts";
@@ -83,3 +99,5 @@ export type { AliyunMockHandle, AliyunMockOptions, AliyunMockState } from "./ali
 export type { DuckdnsMockHandle, DuckdnsMockOptions, DuckdnsMockState } from "./duckdns.ts";
 export type { CustomMockHandle, CustomMockOptions, CustomMockState } from "./custom.ts";
 export type { FreednsMockHandle, FreednsMockOptions, FreednsMockState } from "./freedns.ts";
+export type { RestMockHandle, RestMockOptions, RestMockState } from "./rest.ts";
+export type { DyndnsMockHandle, DyndnsMockOptions, DyndnsMockState } from "./dyndns.ts";

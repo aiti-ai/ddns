@@ -9,7 +9,10 @@ import { readConfig, configPath } from "./config.ts";
 import { resolvePublicIp } from "./ip.ts";
 import { startMockProvider, startTlsProxy, type MockProviderName } from "./mocks/index.ts";
 
-const PROVIDERS = ["cloudflare", "dnspod", "aliyun", "duckdns", "custom", "freedns"];
+import { REST_SPEC_NAMES } from "./providers/rest-specs.ts";
+import { DYNDNS_SERVICE_NAMES } from "./providers/dyndns-services.ts";
+
+const PROVIDERS = ["cloudflare", "dnspod", "aliyun", "duckdns", "custom", "freedns", ...REST_SPEC_NAMES, ...DYNDNS_SERVICE_NAMES];
 
 function usage(): void {
   console.log(`ddns — DDNS + DNS record management (cloudflare/dnspod/aliyun/duckdns/custom)
@@ -142,7 +145,7 @@ async function main(): Promise<void> {
         console.error(`unknown provider: ${provider} (known: ${PROVIDERS.join(", ")})`);
         process.exit(2);
       }
-      const names: MockProviderName[] = provider ? [provider] : ["cloudflare", "dnspod", "aliyun", "duckdns", "custom", "freedns"];
+      const names: MockProviderName[] = provider ? [provider] : [...PROVIDERS];
       const started: unknown[] = [];
       for (const n of names) {
         const h = await startMockProvider(n, { zone: args.zone ?? "example.com", port: args.port } as never);

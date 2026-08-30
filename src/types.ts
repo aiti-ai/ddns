@@ -86,6 +86,10 @@ export interface ProviderConfig {
   ipv6key?: string;
   /** custom webhook: success regex against the response body. */
   successRegex?: string;
+  /** dyndns2 services: username (basic auth). */
+  username?: string;
+  /** dyndns2 services: password (basic auth). */
+  password?: string;
   /** Base URL override (tests point providers at their mocks). */
   baseUrl?: string;
 }
