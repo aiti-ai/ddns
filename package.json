@@ -27,7 +27,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --test-force-exit \"test/**/*.test.mjs\""
+    "test": "node --test --test-force-exit \"test/**/*.test.mjs\"",
+    "verify": "bash scripts/test.sh"
   },
   "keywords": [
     "ddns",
