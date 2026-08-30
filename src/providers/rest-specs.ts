@@ -999,4 +999,85 @@ export const REST_SPECS: RestSpec[] = [
     },
     delete: { path: (z, id) => `/zones/${z}/records/${id}` },
   },
+
+  // onapp: /dns_zones/:id/records.json, HTTP basic auth
+  {
+    name: "onapp",
+    baseUrl: "https://api.onapp.com",
+    auth: { type: "basic", cfgField: "token", env: "DDNS_ONAPP_TOKEN" },
+    zoneIdLookup: { path: () => `/dns_zones.json`, idPath: "0.id" },
+    list: { path: (_z, zid) => `/dns_zones/${zid}/records.json`, recordsPath: ["dns_records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.content ?? r.data),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (_z, zid) => `/dns_zones/${zid}/records.json`,
+      body: (_z, rec) => ({ dns_record: { type: rec.type, name: rec.name, content: rec.value, ttl: rec.ttl ?? 300 } }),
+      idPath: ["dns_record", "id"],
+    },
+    update: {
+      path: (_z, id, zid) => `/dns_zones/${zid}/records/${id}.json`,
+      body: (_z, rec) => ({ dns_record: { type: rec.type, name: rec.name, content: rec.value, ttl: rec.ttl ?? 300 } }),
+      method: "PUT",
+    },
+    delete: { path: (_z, id, zid) => `/dns_zones/${zid}/records/${id}.json` },
+  },
+
+  // exoscale: X-DNS-Token: key:secret header
+  {
+    name: "exoscale",
+    baseUrl: "https://api.exoscale.com/dns",
+    auth: { type: "header", header: "X-DNS-Token", cfgField: "token", env: "DDNS_EXOSCALE_KEY",
+            headerValue: (cfg) => `${cfg.token ?? ""}:${cfg.secret ?? ""}` },
+    list: { path: (z) => `/v1/domains/${z}/records`, recordsPath: ["records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.record_type ?? r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.content),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/v1/domains/${z}/records`,
+      body: (z, rec) => ({ record_type: rec.type, name: rec.name, content: rec.value, ttl: rec.ttl ?? 300 }),
+      idPath: ["record", "id"],
+    },
+    update: {
+      path: (z, id) => `/v1/domains/${z}/records/${id}`,
+      body: (z, rec) => ({ record_type: rec.type, name: rec.name, content: rec.value, ttl: rec.ttl ?? 300 }),
+      method: "PUT",
+    },
+    delete: { path: (z, id) => `/v1/domains/${z}/records/${id}` },
+  },
+
+  // arvancloud: /domains/:id/dns-records (Bearer)
+  {
+    name: "arvancloud",
+    baseUrl: "https://napi.arvancloud.ir/cdn/4.0",
+    auth: { type: "bearer", cfgField: "token", env: "DDNS_ARVANCLOUD_TOKEN" },
+    zoneIdLookup: { path: (z) => `/domains/${z}`, idPath: "data.domain.id" },
+    list: { path: (_z, zid) => `/domains/${zid}/dns-records`, recordsPath: ["data", "dns_records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.value ?? r.content),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (_z, zid) => `/domains/${zid}/dns-records`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, value: rec.value, ttl: rec.ttl ?? 300 }),
+      idPath: ["data", "dns_record", "id"],
+    },
+    update: {
+      path: (_z, id, zid) => `/domains/${zid}/dns-records/${id}`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, value: rec.value, ttl: rec.ttl ?? 300 }),
+      method: "PUT",
+    },
+    delete: { path: (_z, id, zid) => `/domains/${zid}/dns-records/${id}` },
+  },
 ];export const REST_SPEC_NAMES: string[] = REST_SPECS.map((s) => s.name);

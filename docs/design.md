@@ -72,7 +72,7 @@ resolver 不走 NSS），但：
 - 内置 CA/服务端证书在 `src/mocks/assets/`（10 年有效期，仅测试用）；
 - Python lexicon（requests）同样认 `HTTPS_PROXY` + `REQUESTS_CA_BUNDLE`。
 
-## 5. 测试矩阵（105 用例，全离线）
+## 5. 测试矩阵（112 用例，全离线）
 
 | 文件 | 覆盖 | 对齐 |
 |---|---|---|
@@ -84,13 +84,27 @@ resolver 不走 NSS），但：
 | `test/specs.test.mjs` | 14 家 REST + 28 家 dyndns2 的 spec 驱动契约（自动遍历） | Go 各家 |
 | `test/special.test.mjs` | 特例：dreamhost/dondominio/netcup/namesilo/spaceship/route53(SigV4)/gcp | Go 各家 |
 
+## 5b. lexicon 未实现清单（35 家，多为签名/面板/会话类）
+
+以下 lexicon 独有 provider 因特殊认证/协议未实现（接口就绪，可按需手写）：
+
+| 类别 | 家数 | provider |
+|---|---|---|
+| 签名类 | 6 | aurora(HMAC) · qcloud(TC3) · transip(RSA) · azure(OAuth) · oci(Sig) · cloudxns(签名拼接) |
+| 面板/网页会话 | 6 | directadmin · plesk · henet(网页) · easyname(网页) · gransy(SOAP) · infoblox(WAPI) |
+| token/命令类 | 9 | memset(JSON-RPC) · joker(dmapi) · wedos(wapi) · powerdns(unix) · nfsn · yandex(老API) · yandexcloud · softlayer · valuedomain |
+| rrset/特殊 REST | 6 | gehirn · hover · gratisdns · misaka · rcodezero · rackspace(token流程) |
+| 小众/重复 | 8 | devnomads · dinahosting · euserv · hostingde · httpnet · linode4(重复) · localzone(测试) · zeit(旧vercel) |
+
+---
+
 ## 6. 后续（未做）
 
 - `--tls-proxy` 下 lexicon 的 `api_endpoint` 实例属性覆盖用法文档；
 - service-tunnels 集成：`beacon` API + tunnel url 事件联动（远端服务器无人值守
   注册当前 tunnel 域名的完整闭环）。
 
-## 7. 供应商全景（76 家，对齐 Go ddns-updater 全量 + lexicon 补充）
+## 7. 供应商全景（84 家，对齐 Go ddns-updater 全量 + lexicon 补充）
 
 | 类别 | 数量 | 实现 |
 |---|---|---|

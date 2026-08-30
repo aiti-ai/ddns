@@ -21,6 +21,9 @@ export interface RestAuth {
   /** Literal prefix before the credential in the header value
    *  (godaddy: "sso-key " → "Authorization: sso-key <key>:<secret>"). */
   headerPrefix?: string;
+  /** Full custom header value from the config (e.g. exoscale's
+   *  "key:secret" composite). */
+  headerValue?: (cfg: ProviderConfig) => string;
   /** Query key for type "query" (e.g. "key"). */
   queryKey?: string;
   /** Extra query param for type "query" (cloudns: auth-password). */
@@ -128,7 +131,7 @@ export class RestProvider implements ZoneProvider {
     const h: Record<string, string> = { "user-agent": "ddns/0.1" };
     const a = this.#spec.auth;
     if (a.type === "bearer") h.authorization = `Bearer ${this.#cred}`;
-    else if (a.type === "header") h[a.header ?? "X-API-Key"] = `${a.headerPrefix ?? ""}${this.#cred}`;
+    else if (a.type === "header") h[a.header ?? "X-API-Key"] = a.headerValue ? a.headerValue(this.#cfg) : `${a.headerPrefix ?? ""}${this.#cred}`;
     else if (a.type === "basic") h.authorization = `Basic ${Buffer.from(this.#cred).toString("base64")}`;
     if (json) h["content-type"] = "application/json";
     return h;

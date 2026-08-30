@@ -17,7 +17,10 @@ const { startDyndnsMock } = await import("../src/mocks/dyndns.ts");
 for (const spec of REST_SPECS) {
   test(`[rest] ${spec.name}: CRUD against its generic mock`, async () => {
     const mock = await startRestMock({ spec, zone: "example.com", cred: "test-token" });
-    const p = new RestProvider(spec, { provider: spec.name, token: "test-token", baseUrl: mock.url });
+    const cfg = spec.name === "exoscale"
+      ? { provider: spec.name, token: "test-token", secret: "test-token", baseUrl: mock.url }
+      : { provider: spec.name, token: "test-token", baseUrl: mock.url };
+    const p = new RestProvider(spec, cfg);
     try {
       // list (empty)
       const empty = await p.listRecords("example.com");

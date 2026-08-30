@@ -101,6 +101,9 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
     if (saku) b = saku;
     // b.record may be a string (cloudns) or a nested object (pointhq)
     const recField = typeof b.record === "string" ? b.record : (b.record as Record<string, unknown> | undefined)?.data;
+    // onapp nests the record under dns_record
+    const dnsRec = b.dns_record as Record<string, unknown> | undefined;
+    if (dnsRec) b = dnsRec;
     const nsoneAnswer = (b.answers as Array<{ answer?: string[] }> | undefined)?.[0]?.answer?.[0];
     const val = String(
       b.data ?? b.content ?? b.target ?? b.answer ?? b.value ?? b.Value ?? b.RData ??
@@ -124,7 +127,10 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
     const a = spec.auth;
     const expected = opts.cred ?? "test-token";
     if (a.type === "bearer") return req.headers.authorization === `Bearer ${expected}`;
-    if (a.type === "header") return req.headers[(a.header ?? "x-api-key").toLowerCase()] === `${a.headerPrefix ?? ""}${expected}`;
+    if (a.type === "header") {
+      const want = a.headerValue ? a.headerValue({ provider: spec.name, token: opts.cred, secret: opts.cred } as never) : `${a.headerPrefix ?? ""}${expected}`;
+      return req.headers[(a.header ?? "x-api-key").toLowerCase()] === want;
+    }
     if (a.type === "basic") return req.headers.authorization === `Basic ${Buffer.from(expected).toString("base64")}`;
     return true; // query/body auth — skip in generic mock
   };
@@ -183,7 +189,13 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
           data: [{ id: zoneId, domain: zone }],
           response: { records: [{ id: zoneId, domainname: zone }] },
         };
-        return json(res, 200, wrapper);
+        // idPath "data.domain.id" style (arvancloud): serve the object form
+        if (spec.zoneIdLookup.idPath.includes("domain.")) {
+          return json(res, 200, { data: { domain: { id: zoneId, name: zone } } });
+        }
+        // top-level array form (onapp-style idPath "0.id")
+        const arr = [{ id: zoneId, name: zone, domain: zone }];
+        return json(res, 200, spec.zoneIdLookup.idPath === "0.id" ? arr : wrapper);
       }
 
       // list (query-stripped compare; empty recordsPath = bare array body)

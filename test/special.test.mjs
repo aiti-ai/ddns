@@ -9,7 +9,7 @@ import test from "node:test";
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 
-const { DreamhostProvider, DondominioProvider, NetcupProvider, NamesiloProvider, SpaceshipProvider, NamecheapProvider } = await import("../src/providers/special.ts");
+const { DreamhostProvider, DondominioProvider, NetcupProvider, NamesiloProvider, SpaceshipProvider, NamecheapProvider, DnsmadeeasyProvider, UltradnsProvider, ConstellixProvider, DnsservicesProvider } = await import("../src/providers/special.ts");
 const { Route53Provider, awsSigV4 } = await import("../src/providers/route53.ts");
 const { GcpProvider } = await import("../src/providers/gcp.ts");
 
@@ -177,6 +177,122 @@ test("spaceship: X-API-Key + X-API-Secret headers on CRUD", async () => {
     assert.equal(seen[0].secret, "as");
     const created = await p.createRecord("example.com", { type: "A", name: "x.example.com", value: "2.2.2.2" });
     assert.equal(created.id, "r2");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ----------------------------- dnsmadeeasy ------------------------------ */
+
+test("dnsmadeeasy: HMAC headers + managed zone CRUD", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push({ url: req.url, headers: req.headers, body });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url.includes("/dns/managed/name")) res.end(JSON.stringify({ id: "z1" }));
+      else if (req.url.includes("/records") && req.method === "GET") res.end(JSON.stringify({ data: [{ id: "r1", type: "A", name: "home.example.com", value: "1.1.1.1", ttl: 300 }] }));
+      else if (req.method === "POST") res.end(JSON.stringify({ id: "r2" }));
+      else res.end("{}");
+    });
+  });
+  try {
+    const p = new DnsmadeeasyProvider({ apiKey: "k", secret: "s", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    // HMAC headers present
+    assert.ok(seen[0].headers["x-dnsme-apikey"] === "k");
+    assert.ok(seen[0].headers["x-dnsme-hmac"]);
+    assert.ok(seen[0].headers["x-dnsme-requestdate"]);
+
+    const created = await p.createRecord("example.com", { type: "A", name: "x.example.com", value: "2.2.2.2" });
+    assert.equal(created.id, "r2");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------ constellix ------------------------------ */
+
+test("constellix: HMAC headers + rr-set CRUD", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    seen.push({ url: req.url, headers: req.headers });
+    if (req.url === "/domains/" && req.method === "GET") res.end(JSON.stringify({ data: [{ id: "d1", name: "example.com" }] }));
+    else if (req.url.includes("/records") && req.method === "GET") res.end(JSON.stringify({ data: [{ id: 1, name: "home.example.com", type: "A", roundRobin: [{ value: "1.1.1.1" }], ttl: 300 }] }));
+    else if (req.method === "POST") res.end(JSON.stringify({ data: { id: 9 } }));
+    else res.end("{}");
+  });
+  try {
+    const p = new ConstellixProvider({ apiKey: "k", secret: "s", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com", { type: "A" });
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.ok(seen[0].headers["x-cnsdns-apikey"] === "k");
+    assert.ok(seen[0].headers["x-cnsdns-hmac"]);
+    const created = await p.createRecord("example.com", { type: "A", name: "x.example.com", value: "2.2.2.2" });
+    assert.equal(created.id, "9");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------ dnsservices ------------------------------ */
+
+test("dnsservices: login token flow + zone CRUD", async () => {
+  const calls = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      calls.push({ url: req.url, auth: req.headers.authorization, method: req.method });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url === "/login") res.end(JSON.stringify({ token: "tok1" }));
+      else if (req.url === "/dns") res.end(JSON.stringify({ zones: [{ name: "example.com", domain_id: "dom1", service_id: "svc1" }] }));
+      else if (req.url.startsWith("/service/") && req.method === "GET") res.end(JSON.stringify({ records: [{ id: "r1", type: "A", name: "home.example.com", content: "1.1.1.1", ttl: 300 }] }));
+      else if (req.method === "POST") res.end(JSON.stringify({ record: { id: "r2" } }));
+      else res.end("{}");
+    });
+  });
+  try {
+    const p = new DnsservicesProvider({ username: "u", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    // token flow: login first, then Bearer on API calls
+    assert.ok(calls[0].url === "/login");
+    const apiCall = calls.find((c) => c.url.startsWith("/service/"));
+    assert.equal(apiCall.auth, "Bearer tok1");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- ultradns ------------------------------- */
+
+test("ultradns: token acquisition + rrset CRUD", async () => {
+  const calls = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      calls.push({ url: req.url, auth: req.headers.authorization, body });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url.includes("/authorization/token")) res.end(JSON.stringify({ access_token: "tok1" }));
+      else if (req.url.includes("/rrsets") && req.method === "GET") res.end(JSON.stringify({ rrsets: [{ ownerName: "home.example.com.", rrtype: "A", rdata: ["1.1.1.1"], ttl: 300 }] }));
+      else res.end(JSON.stringify({}));
+    });
+  });
+  try {
+    const p = new UltradnsProvider({ username: "u", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].name, "home.example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    // token call happened, then Bearer used
+    assert.ok(calls.some((c) => c.url.includes("/authorization/token")));
+    const rrsetCall = calls.find((c) => c.url.includes("/rrsets"));
+    assert.equal(rrsetCall.auth, "Bearer tok1");
   } finally {
     await new Promise((r) => srv.close(r));
   }

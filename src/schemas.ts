@@ -115,6 +115,25 @@ const HAND_PARAMS: Record<string, ParamSpec[]> = {
     { key: "secret", label: "SecretAccessKey", type: "password", required: true, description: "AWS secret access key" },
     { key: "zoneId", label: "Hosted zone id", type: "string", required: true, description: "Route53 hosted zone id (e.g. Z1234567890)" },
   ],
+  namecheap: [
+    { key: "token", label: "Dynamic DNS password", type: "password", required: true, description: "32-hex Dynamic DNS password (Advanced DNS → Dynamic DNS)" },
+  ],
+  dnsmadeeasy: [
+    { key: "token", label: "API key", type: "password", required: true, description: "DNS Made Easy API key" },
+    { key: "secret", label: "HMAC secret", type: "password", required: true, description: "DNS Made Easy HMAC secret" },
+  ],
+  constellix: [
+    { key: "username", label: "API key", type: "string", required: true, description: "Constellix API key" },
+    { key: "token", label: "Secret key", type: "password", required: true, description: "Constellix secret key (HMAC)" },
+  ],
+  dnsservices: [
+    { key: "username", label: "Username", type: "string", required: true, description: "dns.services account email" },
+    { key: "password", label: "Password", type: "password", required: true, description: "Account password" },
+  ],
+  ultradns: [
+    { key: "username", label: "Username", type: "string", required: true, description: "UltraDNS account username" },
+    { key: "password", label: "Password", type: "password", required: true, description: "UltraDNS account password" },
+  ],
   gcp: [
     { key: "token", label: "OAuth token", type: "password", required: true, description: "Access token (gcloud auth print-access-token), or service-account token" },
     { key: "username", label: "Project id", type: "string", required: true, description: "GCP project id" },
