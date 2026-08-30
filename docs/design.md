@@ -72,7 +72,7 @@ resolver 不走 NSS），但：
 - 内置 CA/服务端证书在 `src/mocks/assets/`（10 年有效期，仅测试用）；
 - Python lexicon（requests）同样认 `HTTPS_PROXY` + `REQUESTS_CA_BUNDLE`。
 
-## 5. 测试矩阵（131 用例，全离线）
+## 5. 测试矩阵（134 用例，全离线）
 
 | 文件 | 覆盖 | 对齐 |
 |---|---|---|
@@ -84,10 +84,17 @@ resolver 不走 NSS），但：
 | `test/specs.test.mjs` | 14 家 REST + 28 家 dyndns2 的 spec 驱动契约（自动遍历） | Go 各家 |
 | `test/special.test.mjs` | 特例：dreamhost/dondominio/netcup/namesilo/spaceship/route53(SigV4)/gcp | Go 各家 |
 
-## 5b. 剩余未实现（12 家，环境特殊）
+## 5b. 剩余未实现（9 家，需外部 SDK/会话环境）
 
-| 类别 | 家数 | provider |
-|---|---|---|
+| 类别 | 家数 | provider | 原因 |
+|---|---|---|---|
+| 云厂商 SDK 签名 | 2 | oci · softlayer | 官方 SDK 内签名（OCI Signer / SoftLayer XML-RPC） |
+| 浏览器会话 | 4 | henet · easyname · hover · euserv | 需 cookie 会话模拟（脆弱，无稳定 API） |
+| SOAP | 1 | gransy | SOAP/WSDL（zeep） |
+| 面板 XML-RPC | 1 | plesk | XML-RPC 深集成（hosting-cli） |
+| 本地测试工具 | 1 | localzone | 非真实 provider（本地 DNS 测试） |
+
+---|---|---|
 | 云厂商 SDK 级 | 3 | azure(OAuth) · oci(Sig) · softlayer(XML-RPC SDK) |
 | 面板/网页会话 | 5 | directadmin · plesk · henet(网页) · easyname(网页) · hover(cookie 会话) |
 | SOAP/本地 | 2 | gransy(SOAP) · localzone(本地测试工具) |
@@ -108,7 +115,7 @@ resolver 不走 NSS），但：
 - service-tunnels 集成：`beacon` API + tunnel url 事件联动（远端服务器无人值守
   注册当前 tunnel 域名的完整闭环）。
 
-## 7. 供应商全景（107 家，对齐 Go ddns-updater 全量 + lexicon 补充）
+## 7. 供应商全景（110 家，对齐 Go ddns-updater 全量 + lexicon 补充）
 
 | 类别 | 数量 | 实现 |
 |---|---|---|

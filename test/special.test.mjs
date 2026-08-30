@@ -10,7 +10,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 
 const { DreamhostProvider, DondominioProvider, NetcupProvider, NamesiloProvider, SpaceshipProvider, NamecheapProvider, DnsmadeeasyProvider, UltradnsProvider, ConstellixProvider, DnsservicesProvider } = await import("../src/providers/special.ts");
-const { AuroraProvider, CloudxnsProvider, YandexProvider, TransipProvider, QcloudProvider, HostingdeProvider, WedosProvider, NfsnProvider, YandexcloudProvider, ValuedomainProvider, RackspaceProvider, MemsetProvider, GehirnProvider, RcodezeroProvider, DevnomadsProvider, MisakaProvider, DinahostingProvider, JokerProvider, PowerdnsProvider } = await import("../src/providers/lexicon-more.ts");
+const { AuroraProvider, CloudxnsProvider, YandexProvider, TransipProvider, QcloudProvider, HostingdeProvider, WedosProvider, NfsnProvider, YandexcloudProvider, ValuedomainProvider, RackspaceProvider, MemsetProvider, GehirnProvider, RcodezeroProvider, DevnomadsProvider, MisakaProvider, DinahostingProvider, JokerProvider, PowerdnsProvider, DirectadminProvider, InfobloxProvider, AzureProvider } = await import("../src/providers/lexicon-more.ts");
 const { Route53Provider, awsSigV4 } = await import("../src/providers/route53.ts");
 const { GcpProvider } = await import("../src/providers/gcp.ts");
 
@@ -745,6 +745,74 @@ test("powerdns: X-API-Key + rrset PATCH", async () => {
     const listed = await p.listRecords("example.com");
     assert.equal(listed[0].value, "1.1.1.1");
     assert.equal(seen[0].key, "k");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------ directadmin ------------------------------ */
+
+test("directadmin: CMD_API_DNS_CONTROL basic auth CRUD", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url.includes("action=list")) res.end(JSON.stringify({ records: [{ name: "home.example.com", type: "A", value: "1.1.1.1", ttl: "300" }] }));
+    else res.end(JSON.stringify({ success: "Record Added" }));
+  });
+  try {
+    const p = new DirectadminProvider({ username: "u", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.match(seen[0].auth, /^Basic /);
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* -------------------------------- infoblox ------------------------------- */
+
+test("infoblox: WAPI basic auth + record CRUD", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url.includes("record:a")) res.end(JSON.stringify([{ _ref: "ref1", name: "home.example.com.", ipv4addr: "1.1.1.1", ttl: 300 }]));
+    else if (req.method === "POST") res.end(JSON.stringify({ _ref: "ref2" }));
+    else res.end("{}");
+  });
+  try {
+    const p = new InfobloxProvider({ username: "u", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].auth, "Basic " + Buffer.from("u:p").toString("base64"));
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* --------------------------------- azure --------------------------------- */
+
+test("azure: OAuth token flow + ARM DNS recordset PUT", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push({ url: req.url, auth: req.headers.authorization });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url.includes("/oauth2")) res.end(JSON.stringify({ access_token: "tok1" }));
+      else if (req.url.includes("/recordsets?")) res.end(JSON.stringify({ value: [{ id: "/sub/rg/dnsZones/example.com/A/home", name: "home", type: "Microsoft.Network/dnszones/A", properties: { TTL: 300, ARecords: [{ ipv4Address: "1.1.1.1" }] } }] }));
+      else if (req.method === "PUT") res.end(JSON.stringify({ id: "rec1" }));
+      else res.end("{}");
+    });
+  });
+  try {
+    const p = new AzureProvider({ clientId: "c", clientSecret: "s", tenantId: "t", subscriptionId: "sub", resourceGroup: "rg", baseUrl: urlOf(srv), authUrl: urlOf(srv) + "/oauth2/token" });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    const apiCall = seen.find((c) => c.url.includes("/recordsets?") && c.auth);
+    assert.equal(apiCall.auth, "Bearer tok1");
   } finally {
     await new Promise((r) => srv.close(r));
   }

@@ -10,7 +10,7 @@ import { createDuckdns } from "./providers/duckdns/index.ts";
 import { createCustom } from "./providers/custom/index.ts";
 import { createFreedns } from "./providers/freedns/index.ts";
 import { createDreamhost, createDondominio, createNetcup, createNamesilo, createSpaceship, createNamecheap, createDnsmadeeasy, createUltradns, createConstellix, createDnsservices } from "./providers/special.ts";
-import { createAurora, createCloudxns, createYandex, createGratisdns, createTransip, createQcloud, createHostingde, createHttpnet, createWedos, createNfsn, createYandexcloud, createValuedomain, createRackspace, createMemset, createGehirn, createRcodezero, createDevnomads, createMisaka, createDinahosting, createJoker, createPowerdns } from "./providers/lexicon-more.ts";
+import { createAurora, createCloudxns, createYandex, createGratisdns, createTransip, createQcloud, createHostingde, createHttpnet, createWedos, createNfsn, createYandexcloud, createValuedomain, createRackspace, createMemset, createGehirn, createRcodezero, createDevnomads, createMisaka, createDinahosting, createJoker, createPowerdns, createDirectadmin, createInfoblox, createAzure } from "./providers/lexicon-more.ts";
 import { createRoute53 } from "./providers/route53.ts";
 import { createGcp } from "./providers/gcp.ts";
 import { normalizeName } from "./providers/common.ts";
@@ -66,6 +66,9 @@ export function createProvider(cfg: ProviderConfig): DnsProvider {
     case "dinahosting": return createDinahosting(cfg);
     case "joker": return createJoker(cfg);
     case "powerdns": return createPowerdns(cfg);
+    case "directadmin": return createDirectadmin(cfg);
+    case "infoblox": return createInfoblox(cfg);
+    case "azure": return createAzure(cfg);
     case "linode4": return createLinodeAlias(cfg);
     case "zeit": return createVercelAlias(cfg);
     case "dreamhost": return createDreamhost(cfg);

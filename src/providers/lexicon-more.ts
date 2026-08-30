@@ -1534,3 +1534,242 @@ export function createPowerdns(cfg: ProviderConfig): PowerdnsProvider {
   const apiKey = cfg.token ?? process.env.DDNS_POWERDNS_API_KEY ?? "";
   return new PowerdnsProvider({ apiKey, baseUrl: cfg.baseUrl });
 }
+
+/* ------------------------------ directadmin ------------------------------ */
+
+/** directadmin: GET /CMD_API_DNS_CONTROL (basic auth, json=yes). */
+export class DirectadminProvider implements ZoneProvider {
+  readonly meta = { name: "directadmin", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["username", "password"], params: [] } as const;
+  readonly #username: string;
+  readonly #password: string;
+  readonly #base: string;
+  readonly #fetch: FetchLike;
+
+  constructor(opts: { username: string; password: string; baseUrl?: string; fetchImpl?: FetchLike }) {
+    if (!opts.username || !opts.password) throw new ProviderError("directadmin requires username + password", "directadmin");
+    this.#username = opts.username;
+    this.#password = opts.password;
+    this.#base = opts.baseUrl ?? "https://example.com:2222";
+    this.#fetch = opts.fetchImpl ?? defaultFetchImpl;
+  }
+
+  async #req(params: Record<string, string>): Promise<Record<string, unknown>> {
+    const q = new URLSearchParams({ json: "yes", ...params }).toString();
+    const res = await this.#fetch(`${this.#base}/CMD_API_DNS_CONTROL?${q}`, {
+      headers: { authorization: `Basic ${Buffer.from(`${this.#username}:${this.#password}`).toString("base64")}` },
+    });
+    const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!res.ok) throw new ProviderError(`directadmin API error HTTP ${res.status}`, "directadmin", res.status);
+    return json ?? {};
+  }
+
+  async listRecords(zone: string, filter?: ListFilter): Promise<DnsRecord[]> {
+    const json = await this.#req({ action: "list", domain: zone });
+    const records = (json.records ?? []) as Array<{ name: string; type: string; value: string; ttl?: string }>;
+    let out = records.map((r, i) => ({
+      id: String(i),
+      type: r.type,
+      name: r.name,
+      value: r.value,
+      ttl: r.ttl ? Number(r.ttl) : undefined,
+    }));
+    if (filter?.type) out = out.filter((r) => r.type === filter.type);
+    if (filter?.name) out = out.filter((r) => r.name === filter.name);
+    return out;
+  }
+
+  async createRecord(zone: string, rec: DnsRecord): Promise<{ id: string }> {
+    await this.#req({ action: "add", domain: zone, name: `${rec.name}.`, type: rec.type, value: rec.value, ttl: String(rec.ttl ?? 300) });
+    return { id: `${rec.name}/${rec.type}` };
+  }
+
+  async updateRecord(zone: string, rec: DnsRecord, id: string): Promise<void> {
+    await this.#req({ action: "modify", domain: zone, name: `${rec.name}.`, type: rec.type, value: rec.value, ttl: String(rec.ttl ?? 300) });
+  }
+
+  async deleteRecord(zone: string, id: string): Promise<void> {
+    const [name, type] = id.split("/");
+    if (!name || !type) return;
+    await this.#req({ action: "delete", domain: zone, name: `${name}.`, type });
+  }
+}
+
+/* -------------------------------- infoblox ------------------------------- */
+
+/** infoblox WAPI: https://<host>/wapi/v2.x/zone_auth + record:* (basic auth). */
+export class InfobloxProvider implements ZoneProvider {
+  readonly meta = { name: "infoblox", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["username", "password", "url (WAPI base incl host)"], params: [] } as const;
+  readonly #username: string;
+  readonly #password: string;
+  readonly #base: string;
+  readonly #fetch: FetchLike;
+
+  constructor(opts: { username: string; password: string; baseUrl?: string; fetchImpl?: FetchLike }) {
+    if (!opts.username || !opts.password) throw new ProviderError("infoblox requires username + password + host", "infoblox");
+    this.#username = opts.username;
+    this.#password = opts.password;
+    this.#base = opts.baseUrl ?? "https://infoblox.example.com/wapi/v2.12";
+    this.#fetch = opts.fetchImpl ?? defaultFetchImpl;
+  }
+
+  async #req(method: string, path: string, body?: unknown): Promise<unknown> {
+    const res = await this.#fetch(`${this.#base}/${path}`, {
+      method,
+      headers: { authorization: `Basic ${Buffer.from(`${this.#username}:${this.#password}`).toString("base64")}`, "content-type": "application/json" },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    const json = (await res.json().catch(() => null)) as unknown;
+    if (!res.ok) throw new ProviderError(`infoblox API error HTTP ${res.status}`, "infoblox", res.status);
+    return json;
+  }
+
+  async listRecords(zone: string, filter?: ListFilter): Promise<DnsRecord[]> {
+    const result = (await this.#req("GET", `record:a?name~=${encodeURIComponent(`${zone}.`)}&_return_fields=name,ipv4addr,ttl`)) as Array<{ _ref: string; name: string; ipv4addr?: string; ttl?: number }>;
+    let out = (Array.isArray(result) ? result : []).map((r) => ({
+      id: r._ref,
+      type: "A",
+      name: (r.name ?? "").replace(/\.$/, ""),
+      value: r.ipv4addr ?? "",
+      ttl: r.ttl,
+    }));
+    if (filter?.type) out = out.filter((r) => r.type === filter.type);
+    if (filter?.name) out = out.filter((r) => r.name === filter.name);
+    return out;
+  }
+
+  async createRecord(zone: string, rec: DnsRecord): Promise<{ id: string }> {
+    const created = (await this.#req("POST", `record:${rec.type.toLowerCase()}`, { name: `${rec.name}.`, ipv4addr: rec.value, ttl: rec.ttl ?? 300 })) as { _ref?: string };
+    return { id: String(created._ref ?? "") };
+  }
+
+  async updateRecord(zone: string, rec: DnsRecord, id: string): Promise<void> {
+    await this.#req("PUT", encodeURIComponent(id), { name: `${rec.name}.`, ipv4addr: rec.value, ttl: rec.ttl ?? 300 });
+  }
+
+  async deleteRecord(zone: string, id: string): Promise<void> {
+    await this.#req("DELETE", encodeURIComponent(id));
+  }
+}
+
+/* --------------------------------- azure -------------------------------- */
+
+/** azure ARM DNS: OAuth client_credentials → /subscriptions/.../dnsZones/:zone/:type/:name */
+export class AzureProvider implements ZoneProvider {
+  readonly meta = { name: "azure", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (client secret)", "username (client id)", "password (tenant id)", "accessKeyId (subscription id)", "zoneId (resource group)"], params: [] } as const;
+  readonly #clientId: string;
+  readonly #clientSecret: string;
+  readonly #tenantId: string;
+  readonly #subscriptionId: string;
+  readonly #resourceGroup: string;
+  readonly #base: string;
+  readonly #authUrl: string;
+  readonly #fetch: FetchLike;
+  #tokenCache: string | null = null;
+
+  constructor(opts: { clientId: string; clientSecret: string; tenantId: string; subscriptionId: string; resourceGroup: string; baseUrl?: string; authUrl?: string; fetchImpl?: FetchLike }) {
+    if (!opts.clientId || !opts.clientSecret || !opts.tenantId || !opts.subscriptionId || !opts.resourceGroup) {
+      throw new ProviderError("azure requires clientId + clientSecret + tenantId + subscriptionId + resourceGroup", "azure");
+    }
+    this.#clientId = opts.clientId;
+    this.#clientSecret = opts.clientSecret;
+    this.#tenantId = opts.tenantId;
+    this.#subscriptionId = opts.subscriptionId;
+    this.#resourceGroup = opts.resourceGroup;
+    this.#base = opts.baseUrl ?? "https://management.azure.com";
+    this.#authUrl = opts.authUrl ?? `https://login.microsoftonline.com/${opts.tenantId}/oauth2/v2.0/token`;
+    this.#fetch = opts.fetchImpl ?? defaultFetchImpl;
+  }
+
+  async #token(): Promise<string> {
+    if (this.#tokenCache) return this.#tokenCache;
+    const res = await this.#fetch(this.#authUrl, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: this.#clientId, client_secret: this.#clientSecret, scope: "https://management.azure.com/.default", grant_type: "client_credentials" }).toString(),
+    });
+    const json = (await res.json().catch(() => null)) as { access_token?: string } | null;
+    if (!json?.access_token) throw new ProviderError("azure token acquisition failed", "azure", res.status);
+    this.#tokenCache = json.access_token;
+    return this.#tokenCache;
+  }
+
+  async #req(method: string, path: string, body?: unknown): Promise<unknown> {
+    const token = await this.#token();
+    const res = await this.#fetch(`${this.#base}${path}`, {
+      method,
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    const json = (await res.json().catch(() => null)) as unknown;
+    if (!res.ok) throw new ProviderError(`azure API error HTTP ${res.status}`, "azure", res.status);
+    return json;
+  }
+
+  #zonePath(zone: string): string {
+    return `/subscriptions/${this.#subscriptionId}/resourceGroups/${this.#resourceGroup}/providers/Microsoft.Network/dnsZones/${zone}`;
+  }
+
+  async listRecords(zone: string, filter?: ListFilter): Promise<DnsRecord[]> {
+    const json = (await this.#req("GET", `${this.#zonePath(zone)}/recordsets?api-version=2018-05-01`)) as { value?: Array<Record<string, unknown>> };
+    let out = ((json.value ?? []) as Array<Record<string, unknown>>).map((r) => {
+      const type = String(r.type ?? "").replace("Microsoft.Network/dnszones/", "");
+      const props = (r.properties ?? {}) as Record<string, unknown>;
+      const txtValue = (props.TXTRecords as Array<{ value?: string[] }> | undefined)?.[0]?.value?.[0];
+      const value = String((props.ARecords as Array<{ ipv4Address?: string }> | undefined)?.[0]?.ipv4Address ?? (props.CNAMERecord as { cname?: string } | undefined)?.cname ?? txtValue ?? "");
+      return {
+        id: String(r.id ?? ""),
+        type,
+        name: String(r.name ?? ""),
+        value,
+        ttl: props.TTL !== undefined ? Number(props.TTL) : undefined,
+      };
+    });
+    if (filter?.type) out = out.filter((r) => r.type === filter.type);
+    if (filter?.name) out = out.filter((r) => r.name === filter.name);
+    return out;
+  }
+
+  async createRecord(zone: string, rec: DnsRecord): Promise<{ id: string }> {
+    const rel = rec.name === zone ? "@" : rec.name.replace(`.${zone}`, "");
+    const props = rec.type === "A"
+      ? { TTL: rec.ttl ?? 300, ARecords: [{ ipv4Address: rec.value }] }
+      : rec.type === "AAAA"
+        ? { TTL: rec.ttl ?? 300, AAAARecords: [{ ipv6Address: rec.value }] }
+        : rec.type === "CNAME"
+          ? { TTL: rec.ttl ?? 300, CNAMERecord: { cname: `${rec.value}.` } }
+          : rec.type === "TXT"
+            ? { TTL: rec.ttl ?? 300, TXTRecords: [{ value: [rec.value] }] }
+            : { TTL: rec.ttl ?? 300 };
+    const json = (await this.#req("PUT", `${this.#zonePath(zone)}/${rec.type}/${rel}?api-version=2018-05-01`, { properties: props })) as { id?: string };
+    return { id: String(json.id ?? "") };
+  }
+
+  async updateRecord(zone: string, rec: DnsRecord, id: string): Promise<void> {
+    await this.createRecord(zone, rec); // ARM PUT is idempotent upsert
+  }
+
+  async deleteRecord(zone: string, id: string): Promise<void> {
+    const rel = id.split("/").pop() ?? "";
+    const type = id.includes("/A/") ? "A" : id.includes("/AAAA/") ? "AAAA" : id.includes("/CNAME/") ? "CNAME" : id.includes("/TXT/") ? "TXT" : "A";
+    await this.#req("DELETE", `${this.#zonePath(zone)}/${type}/${rel}?api-version=2018-05-01`);
+  }
+}
+
+export function createDirectadmin(cfg: ProviderConfig): DirectadminProvider {
+  const username = cfg.username ?? process.env.DDNS_DIRECTADMIN_USERNAME ?? "";
+  const password = cfg.password ?? process.env.DDNS_DIRECTADMIN_PASSWORD ?? "";
+  return new DirectadminProvider({ username, password, baseUrl: cfg.baseUrl });
+}
+export function createInfoblox(cfg: ProviderConfig): InfobloxProvider {
+  const username = cfg.username ?? process.env.DDNS_INFOBLOX_USERNAME ?? "";
+  const password = cfg.password ?? process.env.DDNS_INFOBLOX_PASSWORD ?? "";
+  return new InfobloxProvider({ username, password, baseUrl: cfg.baseUrl });
+}
+export function createAzure(cfg: ProviderConfig): AzureProvider {
+  const clientId = cfg.username ?? process.env.DDNS_AZURE_CLIENT_ID ?? "";
+  const clientSecret = cfg.token ?? process.env.DDNS_AZURE_CLIENT_SECRET ?? "";
+  const tenantId = cfg.password ?? process.env.DDNS_AZURE_TENANT_ID ?? "";
+  const subscriptionId = cfg.accessKeyId ?? process.env.DDNS_AZURE_SUBSCRIPTION_ID ?? "";
+  const resourceGroup = cfg.zoneId ?? process.env.DDNS_AZURE_RESOURCE_GROUP ?? "";
+  return new AzureProvider({ clientId, clientSecret, tenantId, subscriptionId, resourceGroup, baseUrl: cfg.baseUrl });
+}
