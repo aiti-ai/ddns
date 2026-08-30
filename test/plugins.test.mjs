@@ -78,7 +78,7 @@ test("discoverPlugins: finds installed ddns-provider-* package in node_modules",
     `,
   );
   try {
-    const loaded = discoverPlugins(dir);
+    const loaded = await discoverPlugins(dir);
     assert.ok(loaded.includes("ddns-provider-fake"), `discovered ${loaded}`);
     // the discovered provider is usable through the normal factory
     const p = createProvider({ provider: "fakezone" });
@@ -93,6 +93,30 @@ test("discoverPlugins: finds installed ddns-provider-* package in node_modules",
   }
 });
 
+test("discoverPlugins: ESM plugin with top-level await loads via dynamic import", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ddns-plugins-esm-"));
+  const pkgDir = join(dir, "node_modules", "ddns-provider-esm");
+  mkdirSync(pkgDir, { recursive: true });
+  writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: "ddns-provider-esm", version: "1.0.0", type: "module", main: "index.js" }));
+  // top-level await makes require() throw ERR_REQUIRE_ASYNC_MODULE → import fallback
+  writeFileSync(join(pkgDir, "index.js"), `const ready = await Promise.resolve(1);
+export default {
+  providers: ["esmzone"],
+  createProvider() {
+    return { meta: { name: "esmzone", style: "push", recordTypes: ["A"], needsZone: false, authFields: [] }, async pushValue() {} };
+  },
+};
+`);
+  try {
+    const loaded = await discoverPlugins(dir);
+    assert.ok(loaded.includes("ddns-provider-esm"), `ESM plugin loaded: ${loaded}`);
+    const p = createProvider({ provider: "esmzone" });
+    assert.equal(p.meta.style, "push");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("discoverPlugins: broken package is skipped, host keeps working", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ddns-plugins-bad-"));
   const pkgDir = join(dir, "node_modules", "ddns-provider-broken");
@@ -101,7 +125,7 @@ test("discoverPlugins: broken package is skipped, host keeps working", async () 
   writeFileSync(join(pkgDir, "index.js"), `export default { providers: [], createProvider() { throw new Error("boom"); } };`);
   try {
     // discovery must not throw even with a broken package
-    const loaded = discoverPlugins(dir);
+    const loaded = await discoverPlugins(dir);
     assert.ok(!loaded.includes("ddns-provider-broken") || true); // either skipped or loaded; never throws
     // built-in providers still work
     assert.ok(createProvider({ provider: "duckdns", token: "x" }));

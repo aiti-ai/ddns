@@ -138,7 +138,9 @@ export async function deleteRecordByName(cfg: ProviderConfig, zone: string, name
   if (isPushProvider(p)) throw new Error(`provider '${cfg.provider}' is push-style — it has no record delete`);
   const found = await p.listRecords(zone, { type, name });
   if (!found.length) return false;
-  await p.deleteRecord(zone, found[0]!.id!);
+  const rid = found[0]?.id;
+  if (!rid) throw new Error(`provider '${cfg.provider}' returned a record without an id — cannot delete`);
+  await p.deleteRecord(zone, rid);
   return true;
 }
 
@@ -154,7 +156,8 @@ export async function upsertRecord(
   const found = await p.listRecords(zone, { type: rec.type, name: rec.name });
   const match = found.find((r) => r.type === rec.type && normalizeName(r.name) === normalizeName(rec.name));
   if (match) {
-    await p.updateRecord(zone, rec, match.id!);
+    if (!match.id) throw new Error(`provider '${cfg.provider}' returned a record without an id — cannot update`);
+    await p.updateRecord(zone, rec, match.id);
     return { created: false };
   }
   await p.createRecord(zone, rec);

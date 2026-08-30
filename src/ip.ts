@@ -4,6 +4,7 @@
 import type { FetchLike } from "./types.ts";
 
 const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
+const IPV4_SEG_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 const IPV6_RE = /^[0-9a-f:]+$/i;
 
 /** IPv4 sources, in preference order (ddns-updater external-IP pool:
@@ -20,7 +21,11 @@ const defaultFetch: FetchLike = (url, init) =>
   }));
 
 export function isValidIp(ip: string, family: 4 | 6): boolean {
-  return family === 4 ? IPV4_RE.test(ip) : IPV6_RE.test(ip) && ip.includes(":");
+  if (family === 4) {
+    const m = IPV4_SEG_RE.exec(ip);
+    return !!m && m.slice(1).every((seg) => Number(seg) <= 255);
+  }
+  return IPV6_RE.test(ip) && ip.includes(":");
 }
 
 /** Detect the current public IP of a family. Returns null when every source

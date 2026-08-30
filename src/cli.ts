@@ -133,7 +133,7 @@ function resolveConfigFile(args: Args): string {
 async function main(): Promise<void> {
   // third-party providers: load installed ddns-provider-* packages
   try {
-    discoverPlugins();
+    await discoverPlugins();
   } catch {
     // discovery must never block the CLI
   }

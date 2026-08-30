@@ -47,6 +47,9 @@ export interface DdnsResult {
   type: "A" | "AAAA";
   ip: string | null;
   changed: boolean;
+  /** Push-style providers have no readback — every push reports changed; the
+   *  pushed flag distinguishes that from a zone-style change. */
+  pushed?: boolean;
   skipped?: "disabled" | "no-ip" | "unchanged" | "busy";
   error?: string;
 }
@@ -84,7 +87,7 @@ export async function updateEntry(entry: DdnsEntry, deps: DdnsDeps = {}): Promis
     if (isPushProvider(provider)) {
       // duckdns / custom webhook: no readback, push unconditionally
       await provider.pushValue({ name: entry.record, type, value: ip });
-      return { ...base, changed: true };
+      return { ...base, changed: true, pushed: true };
     }
     const zone = entry.zone;
     if (!zone) throw new Error(`provider '${entry.provider}' is zone-style — entry '${entry.name}' needs zone`);
@@ -96,7 +99,8 @@ export async function updateEntry(entry: DdnsEntry, deps: DdnsDeps = {}): Promis
       return { ...base, skipped: "unchanged" }; // Go: up-to-date
     }
     if (match) {
-      await provider.updateRecord(zone, { type, name: entry.record, value: ip, ttl: entry.ttl, proxied: entry.proxied }, match.id!);
+      if (!match.id) throw new Error(`provider '${entry.provider}' returned a record without an id — cannot update`);
+      await provider.updateRecord(zone, { type, name: entry.record, value: ip, ttl: entry.ttl, proxied: entry.proxied }, match.id);
     } else {
       await provider.createRecord(zone, { type, name: entry.record, value: ip, ttl: entry.ttl, proxied: entry.proxied });
     }

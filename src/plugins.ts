@@ -83,19 +83,20 @@ class PluginRegistry {
 
   /** Scan node_modules (cwd upward) for ddns-provider-* packages and load
    *  them. Safe to call repeatedly; each package loads once. */
-  discover(cwd = process.cwd()): string[] {
+  async discover(cwd = process.cwd()): Promise<string[]> {
     const found: string[] = [];
     for (const pkg of findPluginPackages(cwd)) {
       if (this.#loaded.has(pkg)) continue;
-      this.#loaded.add(pkg);
       try {
-        const mod = loadPlugin(pkg, cwd);
+        const mod = await loadPlugin(pkg, cwd);
         if (mod) {
+          this.#loaded.add(pkg);
           this.registerPlugin(mod);
           found.push(pkg);
         }
       } catch (err) {
         // A broken plugin must never break the host — log and continue.
+        // Not marked loaded → a later discover() can retry after a fix.
         console.error(`[ddns] plugin '${pkg}' failed to load: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
@@ -116,7 +117,7 @@ export function registerPlugin(plugin: DdnsPlugin): void {
 
 /** Discover installed ddns-provider-* packages (idempotent). Returns the
  *  package names that were loaded. */
-export function discoverPlugins(cwd?: string): string[] {
+export async function discoverPlugins(cwd?: string): Promise<string[]> {
   return registry.discover(cwd);
 }
 
@@ -159,14 +160,18 @@ function nodeModulesDirs(start: string): string[] {
 }
 
 /** Load a plugin package by name. Works for CJS and ESM exports. */
-function loadPlugin(pkg: string, cwd: string): DdnsPlugin | null {
+async function loadPlugin(pkg: string, cwd: string): Promise<DdnsPlugin | null> {
   const req = createRequire(join(resolve(cwd), "__ddns_plugin_loader__.cjs"));
   let mod: unknown;
   try {
     mod = req(pkg);
-  } catch {
-    // try ESM dynamic import as a fallback (works from CJS contexts)
-    return null;
+  } catch (err) {
+    // ESM with top-level await can't be require()d — fall back to dynamic import
+    if ((err as NodeJS.ErrnoException).code !== "ERR_REQUIRE_ASYNC_MODULE") throw err;
+    // resolve via the caller's node_modules, then dynamic-import the absolute path
+    const resolvedPath = req.resolve(pkg);
+    const imported = await import(resolvedPath).catch(() => null);
+    mod = imported ?? null;
   }
   const resolved = (mod as { default?: unknown; plugin?: unknown }) ?? {};
   const plugin = (resolved.default ?? resolved.plugin ?? resolved) as DdnsPlugin | undefined;

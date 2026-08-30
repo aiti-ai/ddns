@@ -65,7 +65,8 @@ export async function setBeacon(opts: BeaconOptions): Promise<BeaconResult> {
     return { name: opts.name, type, value, created: false }; // already in sync
   }
   if (match) {
-    await p.updateRecord(opts.zone, { type, name: opts.name, value, ttl: opts.ttl }, match.id!);
+    if (!match.id) throw new Error(`beacon: provider returned a record without an id — cannot update`);
+    await p.updateRecord(opts.zone, { type, name: opts.name, value, ttl: opts.ttl }, match.id);
     return { name: opts.name, type, value, created: false };
   }
   await p.createRecord(opts.zone, { type, name: opts.name, value, ttl: opts.ttl });

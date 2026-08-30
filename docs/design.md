@@ -114,11 +114,29 @@ XML-RPC（plesk）、cookie 会话（hover/easyname/euserv）、本地 zone 文�
 
 ---
 
-## 6. 后续（未做）
+## 6. 对接外部实现（Go/Python）
 
-- `--tls-proxy` 下 lexicon 的 `api_endpoint` 实例属性覆盖用法文档；
-- service-tunnels 集成：`beacon` API + tunnel url 事件联动（远端服务器无人值守
-  注册当前 tunnel 域名的完整闭环）。
+### lexicon 的 `api_endpoint` 覆盖用法
+
+lexicon（Python）各 provider 的 `api_endpoint` 是实例属性，可指向我们的 mock：
+
+```python
+from lexicon.config import ConfigResolver
+from lexicon.providers.cloudflare import Provider as CF
+
+config = ConfigResolver().with_dict({"auth_token": "test-token"})
+provider = CF(config)
+provider.api_endpoint = "http://127.0.0.1:<mock-port>/client/v4"  # 覆盖
+```
+
+配合 `ddns mock --tls-proxy`：当 provider 域名硬编码时（如 Go 静态二进制），
+用 `HTTPS_PROXY` + `SSL_CERT_FILE`（Go）或 `REQUESTS_CA_BUNDLE`（Python）指向
+mock 的 TLS 代理面，无需改代码。
+
+### service-tunnels 集成（外部项目）
+
+`beacon` API + tunnel url 事件联动（远端服务器无人值守注册当前 tunnel 域名）
+属 service-tunnels 项目范围，ddns 侧接口已就绪（`setBeacon`）。
 
 ## 7. 供应商全景（120 家，对齐 Go ddns-updater 全量 + lexicon 补充）
 

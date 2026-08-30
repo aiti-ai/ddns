@@ -1,7 +1,7 @@
 /** Config file — <configDir>/ddns.json (0600, holds API tokens). The file is
  *  a JSON array of DdnsEntry (Go ddns-updater settings list semantics). */
 
-import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { DdnsEntry } from "./engine.ts";
 
@@ -25,7 +25,12 @@ export function writeConfig(configDir: string, entries: DdnsEntry[]): void {
   const file = configPath(configDir);
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(entries, null, 2) + "\n", "utf8");
-  chmodSync(tmp, 0o600); // holds API tokens
-  renameSync(tmp, file);
+  try {
+    // 0600 from the start (no window where tokens are world-readable)
+    writeFileSync(tmp, JSON.stringify(entries, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+    renameSync(tmp, file);
+  } catch (err) {
+    rmSync(tmp, { force: true });
+    throw err;
+  }
 }

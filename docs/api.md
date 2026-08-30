@@ -90,7 +90,8 @@ interface DdnsResult {
   name; provider; record; type: "A"|"AAAA";
   ip: string | null;
   changed: boolean;
-  skipped?: "disabled" | "no-ip" | "unchanged";
+  pushed?: boolean;            // push 型 provider（无读回）每次 changed 时标注
+  skipped?: "disabled" | "no-ip" | "unchanged" | "busy";
   error?: string;              // 出错不 throw，落在结果上
 }
 interface DdnsDeps {
