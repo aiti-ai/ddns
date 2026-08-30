@@ -72,7 +72,7 @@ resolver 不走 NSS），但：
 - 内置 CA/服务端证书在 `src/mocks/assets/`（10 年有效期，仅测试用）；
 - Python lexicon（requests）同样认 `HTTPS_PROXY` + `REQUESTS_CA_BUNDLE`。
 
-## 5. 测试矩阵（112 用例，全离线）
+## 5. 测试矩阵（131 用例，全离线）
 
 | 文件 | 覆盖 | 对齐 |
 |---|---|---|
@@ -84,12 +84,16 @@ resolver 不走 NSS），但：
 | `test/specs.test.mjs` | 14 家 REST + 28 家 dyndns2 的 spec 驱动契约（自动遍历） | Go 各家 |
 | `test/special.test.mjs` | 特例：dreamhost/dondominio/netcup/namesilo/spaceship/route53(SigV4)/gcp | Go 各家 |
 
-## 5b. lexicon 未实现清单（35 家，多为签名/面板/会话类）
-
-以下 lexicon 独有 provider 因特殊认证/协议未实现（接口就绪，可按需手写）：
+## 5b. 剩余未实现（12 家，环境特殊）
 
 | 类别 | 家数 | provider |
 |---|---|---|
+| 云厂商 SDK 级 | 3 | azure(OAuth) · oci(Sig) · softlayer(XML-RPC SDK) |
+| 面板/网页会话 | 5 | directadmin · plesk · henet(网页) · easyname(网页) · hover(cookie 会话) |
+| SOAP/本地 | 2 | gransy(SOAP) · localzone(本地测试工具) |
+| 其他 | 2 | infoblox(WAPI) · euserv(网页) |
+
+---|---|---|
 | 签名类 | 6 | aurora(HMAC) · qcloud(TC3) · transip(RSA) · azure(OAuth) · oci(Sig) · cloudxns(签名拼接) |
 | 面板/网页会话 | 6 | directadmin · plesk · henet(网页) · easyname(网页) · gransy(SOAP) · infoblox(WAPI) |
 | token/命令类 | 9 | memset(JSON-RPC) · joker(dmapi) · wedos(wapi) · powerdns(unix) · nfsn · yandex(老API) · yandexcloud · softlayer · valuedomain |
@@ -104,7 +108,7 @@ resolver 不走 NSS），但：
 - service-tunnels 集成：`beacon` API + tunnel url 事件联动（远端服务器无人值守
   注册当前 tunnel 域名的完整闭环）。
 
-## 7. 供应商全景（84 家，对齐 Go ddns-updater 全量 + lexicon 补充）
+## 7. 供应商全景（107 家，对齐 Go ddns-updater 全量 + lexicon 补充）
 
 | 类别 | 数量 | 实现 |
 |---|---|---|

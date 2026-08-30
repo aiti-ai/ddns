@@ -10,6 +10,7 @@ import { createDuckdns } from "./providers/duckdns/index.ts";
 import { createCustom } from "./providers/custom/index.ts";
 import { createFreedns } from "./providers/freedns/index.ts";
 import { createDreamhost, createDondominio, createNetcup, createNamesilo, createSpaceship, createNamecheap, createDnsmadeeasy, createUltradns, createConstellix, createDnsservices } from "./providers/special.ts";
+import { createAurora, createCloudxns, createYandex, createGratisdns, createTransip, createQcloud, createHostingde, createHttpnet, createWedos, createNfsn, createYandexcloud, createValuedomain, createRackspace, createMemset, createGehirn, createRcodezero, createDevnomads, createMisaka, createDinahosting, createJoker, createPowerdns } from "./providers/lexicon-more.ts";
 import { createRoute53 } from "./providers/route53.ts";
 import { createGcp } from "./providers/gcp.ts";
 import { normalizeName } from "./providers/common.ts";
@@ -44,6 +45,29 @@ export function createProvider(cfg: ProviderConfig): DnsProvider {
     case "ultradns": return createUltradns(cfg);
     case "constellix": return createConstellix(cfg);
     case "dnsservices": return createDnsservices(cfg);
+    case "aurora": return createAurora(cfg);
+    case "cloudxns": return createCloudxns(cfg);
+    case "yandex": return createYandex(cfg);
+    case "gratisdns": return createGratisdns(cfg);
+    case "transip": return createTransip(cfg);
+    case "qcloud": return createQcloud(cfg);
+    case "hostingde": return createHostingde(cfg);
+    case "httpnet": return createHttpnet(cfg);
+    case "wedos": return createWedos(cfg);
+    case "nfsn": return createNfsn(cfg);
+    case "yandexcloud": return createYandexcloud(cfg);
+    case "valuedomain": return createValuedomain(cfg);
+    case "rackspace": return createRackspace(cfg);
+    case "memset": return createMemset(cfg);
+    case "gehirn": return createGehirn(cfg);
+    case "rcodezero": return createRcodezero(cfg);
+    case "devnomads": return createDevnomads(cfg);
+    case "misaka": return createMisaka(cfg);
+    case "dinahosting": return createDinahosting(cfg);
+    case "joker": return createJoker(cfg);
+    case "powerdns": return createPowerdns(cfg);
+    case "linode4": return createLinodeAlias(cfg);
+    case "zeit": return createVercelAlias(cfg);
     case "dreamhost": return createDreamhost(cfg);
     case "dondominio": return createDondominio(cfg);
     case "netcup": return createNetcup(cfg);
@@ -122,4 +146,14 @@ export async function upsertRecord(
   }
   await p.createRecord(zone, rec);
   return { created: true };
+}
+function createLinodeAlias(cfg: ProviderConfig): DnsProvider {
+  const spec = REST_SPECS.find((s) => s.name === "linode");
+  if (!spec) throw new Error("linode spec missing");
+  return new RestProvider(spec, cfg);
+}
+function createVercelAlias(cfg: ProviderConfig): DnsProvider {
+  const spec = REST_SPECS.find((s) => s.name === "vercel");
+  if (!spec) throw new Error("vercel spec missing");
+  return new RestProvider(spec, cfg);
 }

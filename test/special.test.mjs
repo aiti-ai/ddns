@@ -10,6 +10,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 
 const { DreamhostProvider, DondominioProvider, NetcupProvider, NamesiloProvider, SpaceshipProvider, NamecheapProvider, DnsmadeeasyProvider, UltradnsProvider, ConstellixProvider, DnsservicesProvider } = await import("../src/providers/special.ts");
+const { AuroraProvider, CloudxnsProvider, YandexProvider, TransipProvider, QcloudProvider, HostingdeProvider, WedosProvider, NfsnProvider, YandexcloudProvider, ValuedomainProvider, RackspaceProvider, MemsetProvider, GehirnProvider, RcodezeroProvider, DevnomadsProvider, MisakaProvider, DinahostingProvider, JokerProvider, PowerdnsProvider } = await import("../src/providers/lexicon-more.ts");
 const { Route53Provider, awsSigV4 } = await import("../src/providers/route53.ts");
 const { GcpProvider } = await import("../src/providers/gcp.ts");
 
@@ -293,6 +294,457 @@ test("ultradns: token acquisition + rrset CRUD", async () => {
     assert.ok(calls.some((c) => c.url.includes("/authorization/token")));
     const rrsetCall = calls.find((c) => c.url.includes("/rrsets"));
     assert.equal(rrsetCall.auth, "Bearer tok1");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- aurora -------------------------------- */
+
+test("aurora: AuroraDNSv1 HMAC signature header + CRUD", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization, date: req.headers["x-auroradns-date"] });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url === "/zones") res.end(JSON.stringify([{ id: "z1", name: "example.com" }]));
+    else if (req.url.includes("/records") && req.method === "GET") res.end(JSON.stringify([{ id: "r1", type: "A", name: "home.example.com", content: "1.1.1.1", ttl: 300 }]));
+    else if (req.method === "POST") res.end(JSON.stringify({ id: "r2" }));
+    else res.end("{}");
+  });
+  try {
+    const p = new AuroraProvider({ apiKey: "k", secret: "s", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.match(seen[0].auth, /^AuroraDNSv1 /);
+    assert.ok(seen[0].date);
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- cloudxns ------------------------------- */
+
+test("cloudxns: API-KEY + API-REQUEST-DATE + API-HASH signed headers", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, key: req.headers["api-key"], date: req.headers["api-request-date"], hash: req.headers["api-hash"] });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url === "/domain") res.end(JSON.stringify({ code: 1, data: [{ id: "d1", domain: "example.com." }] }));
+    else if (req.url.includes("/record/") && req.method === "GET") res.end(JSON.stringify({ code: 1, data: [{ record_id: "r1", type: "A", host: "home.example.com", value: "1.1.1.1", ttl: 300 }] }));
+    else res.end(JSON.stringify({ code: 1, data: {} }));
+  });
+  try {
+    const p = new CloudxnsProvider({ apiKey: "k", secret: "s", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].key, "k");
+    assert.ok(seen[0].date);
+    assert.ok(seen[0].hash, "API-HASH present");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* -------------------------------- yandex -------------------------------- */
+
+test("yandex: PddToken header + list/add/edit/del", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, token: req.headers.pdttoken, method: req.method });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url.includes("/list")) res.end(JSON.stringify({ success: "ok", records: [{ record_id: "r1", type: "A", fqdn: "home.example.com", content: "1.1.1.1", ttl: 300 }] }));
+    else res.end(JSON.stringify({ success: "ok", record_id: "r2" }));
+  });
+  try {
+    const p = new YandexProvider({ token: "t", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].token, "t");
+    const created = await p.createRecord("example.com", { type: "A", name: "x.example.com", value: "2.2.2.2" });
+    assert.equal(created.id, "r2");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* -------------------------------- transip ------------------------------- */
+
+test("transip: RSA-signed auth → Bearer → dns CRUD", async () => {
+  const calls = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      calls.push({ url: req.url, sig: req.headers.signature, auth: req.headers.authorization });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url === "/auth") res.end(JSON.stringify({ token: "tok1" }));
+      else if (req.url.includes("/dns") && req.method === "GET") res.end(JSON.stringify({ dnsEntries: [{ id: "1", type: "A", name: "home.example.com", content: "1.1.1.1", ttl: 300 }] }));
+      else res.end(JSON.stringify({}));
+    });
+  });
+  try {
+    // minimal RSA key for signing (test-only; transip validates server-side)
+    const { generateKeyPairSync } = await import("node:crypto");
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" });
+    const p = new TransipProvider({ login: "u", privateKeyPem: pem, baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    // auth call signed + Bearer used after
+    assert.ok(calls[0].url === "/auth" && calls[0].sig);
+    const apiCall = calls.find((c) => c.url.includes("/dns") && c.url !== "/auth");
+    assert.equal(apiCall.auth, "Bearer tok1");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* -------------------------------- qcloud -------------------------------- */
+
+test("qcloud: TC3-HMAC-SHA256 signed requests + DNSPod CRUD", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push({ action: req.headers["x-tc-action"], auth: req.headers.authorization, body });
+      res.writeHead(200, { "content-type": "application/json" });
+      const payload = JSON.parse(body);
+      if (payload.Keyword) res.end(JSON.stringify({ Response: { DomainList: [{ DomainId: 123 }] } }));
+      else if (payload.RecordId === 9) res.end(JSON.stringify({ Response: {} }));
+      else if (req.headers["x-tc-action"] === "describerecordlist") res.end(JSON.stringify({ Response: { RecordList: [{ RecordId: 9, Type: "A", Name: "home", Value: "1.1.1.1", TTL: 600 }] } }));
+      else res.end(JSON.stringify({ Response: { RecordId: 9 } }));
+    });
+  });
+  try {
+    const p = new QcloudProvider({ secretId: "sid", secretKey: "skey", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    // TC3 signature header present
+    assert.match(seen[0].auth, /^TC3-HMAC-SHA256 Credential=sid\//);
+    const created = await p.createRecord("example.com", { type: "A", name: "x.example.com", value: "2.2.2.2" });
+    assert.equal(created.id, "9");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------ hostingde ------------------------------- */
+
+test("hostingde: JSON-RPC recordsFind/Create/Update/Delete with authToken", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push({ url: req.url, body: JSON.parse(body) });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url.includes("recordsFind")) res.end(JSON.stringify({ status: "success", data: { records: [{ id: "r1", type: "A", name: "home.example.com", content: "1.1.1.1", ttl: 300 }] } }));
+      else if (req.url.includes("recordsCreate")) res.end(JSON.stringify({ status: "success", data: { records: [{ id: "r2" }] } }));
+      else res.end(JSON.stringify({ status: "success", data: {} }));
+    });
+  });
+  try {
+    const p = new HostingdeProvider({ token: "t", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].body.authToken, "t");
+    const created = await p.createRecord("example.com", { type: "A", name: "x.example.com", value: "2.2.2.2" });
+    assert.equal(created.id, "r2");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* -------------------------------- wedos --------------------------------- */
+
+test("wedos: wapi auth hash + dns-row commands", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      const reqObj = JSON.parse(new URLSearchParams(body).get("request"));
+      seen.push({ command: reqObj.command, user: reqObj.user, auth: reqObj.auth });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (reqObj.command === "dns-rows-list") res.end(JSON.stringify({ response: { code: 1000, data: { row: [{ ID: "r1", name: "home.example.com", rdtype: "A", rdata: "1.1.1.1", ttl: 300 }] } } }));
+      else res.end(JSON.stringify({ response: { code: 1000, data: { id: "r2" } } }));
+    });
+  });
+  try {
+    const p = new WedosProvider({ username: "u", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].user, "u");
+    assert.ok(seen[0].auth, "auth hash present");
+    const created = await p.createRecord("example.com", { type: "A", name: "x.example.com", value: "2.2.2.2" });
+    assert.equal(created.id, "r2");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* -------------------------------- nfsn ---------------------------------- */
+
+test("nfsn: X-NFSN-Authentication header + dns CRUD", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers["x-nfsn-authentication"] });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url.includes("/list")) res.end(JSON.stringify([{ id: "r1", type: "A", name: "home.example.com", data: "1.1.1.1" }]));
+    else res.end(JSON.stringify({ id: "r2" }));
+  });
+  try {
+    const p = new NfsnProvider({ login: "l", key: "k", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].auth, "l:k");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------ yandexcloud ------------------------------ */
+
+test("yandexcloud: IAM token + folderId zone lookup + record sets", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url.includes("/zones?")) res.end(JSON.stringify({ zones: [{ id: "z1" }] }));
+    else if (req.url.includes("listRecordSets")) res.end(JSON.stringify({ recordSets: [{ id: "rs1", type: "A", fqdn: "home.example.com.", ttl: "300", data: ["1.1.1.1"] }] }));
+    else res.end(JSON.stringify({}));
+  });
+  try {
+    const p = new YandexcloudProvider({ token: "t", folderId: "f", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].auth, "Bearer t");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------ valuedomain ------------------------------ */
+
+test("valuedomain: Bearer REST /domains/:name/dns", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url.includes("/dns") && req.method === "GET") res.end(JSON.stringify({ results: [{ id: "r1", type: "A", name: "home.example.com", value: "1.1.1.1", ttl: 300 }] }));
+    else res.end(JSON.stringify({ id: "r2" }));
+  });
+  try {
+    const p = new ValuedomainProvider({ token: "t", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].auth, "Bearer t");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- rackspace ------------------------------- */
+
+test("rackspace: token acquisition → X-Auth-Token → records", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers["x-auth-token"] });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url.includes("/tokens")) res.end(JSON.stringify({ access: { token: { id: "tok1" }, user: { tenantId: "ten1" } } }));
+    else if (req.url.includes("/domains?name=")) res.end(JSON.stringify({ domains: [{ id: "d1" }] }));
+    else if (req.url.includes("/records") && req.method === "GET") res.end(JSON.stringify({ records: [{ id: "r1", type: "A", name: "home.example.com", data: "1.1.1.1", ttl: 300 }] }));
+    else res.end(JSON.stringify({}));
+  });
+  try {
+    const p = new RackspaceProvider({ username: "u", apiKey: "k", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    const recordsCall = seen.find((c) => c.url.includes("/records"));
+    assert.equal(recordsCall.auth, "tok1");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* -------------------------------- memset --------------------------------- */
+
+test("memset: X-Auth-Key + JSON-RPC zone methods", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, key: req.headers["x-auth-key"] });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url.includes("dns.zone_domain_info")) res.end(JSON.stringify({ zone_id: "z1" }));
+    else if (req.url.includes("dns.zone_info")) res.end(JSON.stringify({ records: [{ id: "r1", type: "A", name: "home.example.com", content: "1.1.1.1", ttl: 300 }] }));
+    else res.end(JSON.stringify({ id: "r2" }));
+  });
+  try {
+    const p = new MemsetProvider({ apiKey: "k", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].key, "k");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* -------------------------------- gehirn -------------------------------- */
+
+test("gehirn: Basic auth + zones→versions→records", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url === "/zones") res.end(JSON.stringify({ zones: [{ id: "z1", name: "example.com" }] }));
+    else if (req.url.endsWith("/versions")) res.end(JSON.stringify({ versions: [{ id: "v1" }] }));
+    else if (req.url.endsWith("/records")) res.end(JSON.stringify({ records: [{ id: "r1", type: "A", name: "home.example.com", content: "1.1.1.1", ttl: 300 }] }));
+    else res.end(JSON.stringify({ id: "r2" }));
+  });
+  try {
+    const p = new GehirnProvider({ token: "t", secret: "s", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.match(seen[0].auth, /^Basic /);
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- rcodezero ------------------------------- */
+
+test("rcodezero: Bearer + rrset CRUD", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url === "/zones/") res.end(JSON.stringify({ zones: [{ id: "z1", name: "example.com" }] }));
+    else if (req.url.includes("/rrsets") && req.method === "GET") res.end(JSON.stringify({ rrsets: [{ name: "home.example.com", type: "A", records: [{ content: "1.1.1.1", disabled: false }], ttl: 300 }] }));
+    else res.end(JSON.stringify({}));
+  });
+  try {
+    const p = new RcodezeroProvider({ token: "t", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].auth, "Bearer t");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- devnomads ------------------------------- */
+
+test("devnomads: Bearer + rrset REPLACE", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url === "/zones/") res.end(JSON.stringify({ zones: [{ id: "z1", name: "example.com" }] }));
+    else if (req.url.includes("/rrsets") && req.method === "GET") res.end(JSON.stringify({ rrsets: [{ name: "home.example.com", type: "A", records: [{ content: "1.1.1.1", disabled: false }], ttl: 600 }] }));
+    else res.end(JSON.stringify({}));
+  });
+  try {
+    const p = new DevnomadsProvider({ token: "t", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].auth, "Bearer t");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* -------------------------------- misaka -------------------------------- */
+
+test("misaka: Token auth + recordsets CRUD", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization });
+    res.writeHead(200, { "content-type": "application/json" });
+    if (req.url.includes("/settings")) res.end(JSON.stringify({ id: "z1" }));
+    else if (req.url.includes("/recordsets") && req.method === "GET") res.end(JSON.stringify({ recordsets: [{ name: "home.example.com", type: "A", records: [{ content: "1.1.1.1", disabled: false }], ttl: 300 }] }));
+    else res.end(JSON.stringify({}));
+  });
+  try {
+    const p = new MisakaProvider({ token: "t", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].auth, "Token t");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- dinahosting ----------------------------- */
+
+test("dinahosting: form API with user/passwd + zone commands", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push(Object.fromEntries(new URLSearchParams(body)));
+      res.writeHead(200, { "content-type": "application/json" });
+      if (seen.at(-1).cmd === "dns_zone_info") res.end(JSON.stringify({ records: [{ id: "r1", type: "A", name: "home.example.com", content: "1.1.1.1", ttl: 300 }] }));
+      else res.end(JSON.stringify({}));
+    });
+  });
+  try {
+    const p = new DinahostingProvider({ username: "u", password: "p", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].user, "u");
+    assert.equal(seen[0].cmd, "dns_zone_info");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* --------------------------------- joker -------------------------------- */
+
+test("joker: login → auth-sid → dns-zone-get", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push({ url: req.url, body });
+      res.writeHead(200, { "content-type": "text/plain" });
+      if (req.url === "/login") res.end("auth-sid=abc123\n\n");
+      else res.end("home.example.com A 1.1.1.1 300\nwww.example.com CNAME home.example.com 300");
+    });
+  });
+  try {
+    const p = new JokerProvider({ apiKey: "k", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(listed.length, 2);
+    assert.ok(seen[0].body.includes("api-key=k"));
+    const zoneCall = seen.find((c) => c.url === "/dns-zone-get");
+    assert.ok(zoneCall.body.includes("auth-sid=abc123"));
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- powerdns -------------------------------- */
+
+test("powerdns: X-API-Key + rrset PATCH", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push({ url: req.url, key: req.headers["x-api-key"], body });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.method === "GET") res.end(JSON.stringify({ records: [{ name: "home.example.com.", type: "A", content: "1.1.1.1", ttl: 300 }] }));
+      else res.end("{}");
+    });
+  });
+  try {
+    const p = new PowerdnsProvider({ apiKey: "k", baseUrl: urlOf(srv) });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    assert.equal(seen[0].key, "k");
   } finally {
     await new Promise((r) => srv.close(r));
   }

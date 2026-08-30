@@ -134,6 +134,13 @@ const HAND_PARAMS: Record<string, ParamSpec[]> = {
     { key: "username", label: "Username", type: "string", required: true, description: "UltraDNS account username" },
     { key: "password", label: "Password", type: "password", required: true, description: "UltraDNS account password" },
   ],
+  misaka: [
+    { key: "token", label: "Token", type: "password", required: true, description: "Misaka API token" },
+  ],
+  dinahosting: [
+    { key: "username", label: "Username", type: "string", required: true, description: "dinahosting account" },
+    { key: "password", label: "Password", type: "password", required: true, description: "Account password" },
+  ],
   gcp: [
     { key: "token", label: "OAuth token", type: "password", required: true, description: "Access token (gcloud auth print-access-token), or service-account token" },
     { key: "username", label: "Project id", type: "string", required: true, description: "GCP project id" },
