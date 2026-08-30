@@ -72,7 +72,7 @@ resolver 不走 NSS），但：
 - 内置 CA/服务端证书在 `src/mocks/assets/`（10 年有效期，仅测试用）；
 - Python lexicon（requests）同样认 `HTTPS_PROXY` + `REQUESTS_CA_BUNDLE`。
 
-## 5. 测试矩阵（142 用例，全离线）
+## 5. 测试矩阵（143 用例，全离线）
 
 | 文件 | 覆盖 | 对齐 |
 |---|---|---|
@@ -84,7 +84,7 @@ resolver 不走 NSS），但：
 | `test/specs.test.mjs` | 14 家 REST + 28 家 dyndns2 的 spec 驱动契约（自动遍历） | Go 各家 |
 | `test/special.test.mjs` | 特例：dreamhost/dondominio/netcup/namesilo/spaceship/route53(SigV4)/gcp | Go 各家 |
 
-## 5b. provider 全覆盖（119 家）
+## 5b. provider 全覆盖（120 家）
 
 Go ddns-updater 全量 61 家 + lexicon 全量 46 家 + 特例全部实现。
 特殊协议覆盖：TC3 签名（qcloud）、RSA 签名（transip/oci）、HMAC（aurora/
@@ -120,7 +120,7 @@ XML-RPC（plesk）、cookie 会话（hover/easyname/euserv）、本地 zone 文�
 - service-tunnels 集成：`beacon` API + tunnel url 事件联动（远端服务器无人值守
   注册当前 tunnel 域名的完整闭环）。
 
-## 7. 供应商全景（119 家，对齐 Go ddns-updater 全量 + lexicon 补充）
+## 7. 供应商全景（120 家，对齐 Go ddns-updater 全量 + lexicon 补充）
 
 | 类别 | 数量 | 实现 |
 |---|---|---|

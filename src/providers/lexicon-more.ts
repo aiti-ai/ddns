@@ -2463,3 +2463,110 @@ export function createHover(cfg: ProviderConfig): HoverProvider {
   const password = cfg.password ?? process.env.DDNS_HOVER_PASSWORD ?? "";
   return new HoverProvider({ username, password, baseUrl: cfg.baseUrl });
 }
+
+/* ------------------------------ googleclouddns ---------------------------- */
+
+/** googleclouddns: GCP service-account JWT (RS256) → Bearer token →
+ *  Cloud DNS (managedZones rrsets). Unlike "gcp" (which takes a ready
+ *  access token), this one signs the JWT itself from a service account. */
+export class GoogleclouddnsProvider implements ZoneProvider {
+  readonly meta = { name: "googleclouddns", style: "zone", recordTypes: ["A", "AAAA", "CNAME", "TXT", "MX"], needsZone: true, authFields: ["token (private key PEM)", "username (client email)", "secret (project id)", "password (managed zone)"], params: [] } as const;
+  readonly #clientEmail: string;
+  readonly #privateKeyPem: string;
+  readonly #project: string;
+  readonly #zone: string;
+  readonly #base: string;
+  readonly #authUrl: string;
+  readonly #fetch: FetchLike;
+  #tokenCache: string | null = null;
+
+  constructor(opts: { clientEmail: string; privateKeyPem: string; project: string; zone: string; baseUrl?: string; authUrl?: string; fetchImpl?: FetchLike }) {
+    if (!opts.clientEmail || !opts.privateKeyPem || !opts.project || !opts.zone) {
+      throw new ProviderError("googleclouddns requires clientEmail + privateKeyPem + project + zone", "googleclouddns");
+    }
+    this.#clientEmail = opts.clientEmail;
+    this.#privateKeyPem = opts.privateKeyPem;
+    this.#project = opts.project;
+    this.#zone = opts.zone;
+    this.#base = opts.baseUrl ?? "https://dns.googleapis.com/dns/v1";
+    this.#authUrl = opts.authUrl ?? "https://oauth2.googleapis.com/token";
+    this.#fetch = opts.fetchImpl ?? defaultFetchImpl;
+  }
+
+  async #token(): Promise<string> {
+    if (this.#tokenCache) return this.#tokenCache;
+    const { createSign, constants } = await import("node:crypto");
+    const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
+    const now = Math.floor(Date.now() / 1000);
+    const claims = Buffer.from(JSON.stringify({
+      iss: this.#clientEmail, scope: "https://www.googleapis.com/auth/ndev.clouddns.readwrite",
+      aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600,
+    })).toString("base64url");
+    const signer = createSign("RSA-SHA256");
+    signer.update(`${header}.${claims}`);
+    const signature = signer.sign({ key: this.#privateKeyPem, padding: constants.RSA_PKCS1_PADDING }).toString("base64url");
+    const assertion = `${header}.${claims}.${signature}`;
+    const res = await this.#fetch(this.#authUrl, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }).toString(),
+    });
+    const json = (await res.json().catch(() => null)) as { access_token?: string } | null;
+    if (!json?.access_token) throw new ProviderError("googleclouddns token acquisition failed", "googleclouddns", res.status);
+    this.#tokenCache = json.access_token;
+    return this.#tokenCache;
+  }
+
+  async #req(method: string, path: string, body?: unknown): Promise<{ status: number; json: unknown }> {
+    const token = await this.#token();
+    const res = await this.#fetch(`${this.#base}${path}`, {
+      method,
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    const json = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    if (!res.ok) throw new ProviderError(`googleclouddns API error HTTP ${res.status}: ${json?.error?.message ?? ""}`, "googleclouddns", res.status);
+    return { status: res.status, json };
+  }
+
+  async listRecords(zone: string, filter?: ListFilter): Promise<DnsRecord[]> {
+    const { json } = await this.#req("GET", `/projects/${this.#project}/managedZones/${this.#zone}/rrsets`);
+    let out = ((json as { rrsets?: Array<Record<string, unknown>> }).rrsets ?? []).map((r) => ({
+      id: String(r.name ?? "") + "/" + String(r.type ?? ""),
+      type: String(r.type),
+      name: String(r.name ?? "").replace(/\.$/, ""),
+      value: String((r.rrdatas as string[] | undefined)?.[0] ?? ""),
+      ttl: r.ttl !== undefined ? Number(r.ttl) : undefined,
+    }));
+    if (filter?.type) out = out.filter((r) => r.type === filter.type);
+    if (filter?.name) out = out.filter((r) => r.name === filter.name);
+    return out;
+  }
+
+  async createRecord(zone: string, rec: DnsRecord): Promise<{ id: string }> {
+    const name = rec.name.endsWith(".") ? rec.name : `${rec.name}.`;
+    await this.#req("POST", `/projects/${this.#project}/managedZones/${this.#zone}/changes`, { additions: [{ name, type: rec.type, ttl: rec.ttl ?? 300, rrdatas: [rec.value] }] });
+    return { id: `${name}/${rec.type}` };
+  }
+
+  async updateRecord(zone: string, rec: DnsRecord, id: string): Promise<void> {
+    const name = rec.name.endsWith(".") ? rec.name : `${rec.name}.`;
+    await this.#req("POST", `/projects/${this.#project}/managedZones/${this.#zone}/changes`, {
+      deletions: [{ name, type: rec.type }], additions: [{ name, type: rec.type, ttl: rec.ttl ?? 300, rrdatas: [rec.value] }],
+    });
+  }
+
+  async deleteRecord(zone: string, id: string): Promise<void> {
+    const [name, type] = id.split("/");
+    if (!name || !type) return;
+    await this.#req("POST", `/projects/${this.#project}/managedZones/${this.#zone}/changes`, { deletions: [{ name, type }] });
+  }
+}
+
+export function createGoogleclouddns(cfg: ProviderConfig): GoogleclouddnsProvider {
+  const clientEmail = cfg.username ?? process.env.DDNS_GOOGLECLOUDDNS_CLIENT_EMAIL ?? "";
+  const privateKeyPem = cfg.token ?? process.env.DDNS_GOOGLECLOUDDNS_PRIVATE_KEY ?? "";
+  const project = cfg.secret ?? process.env.DDNS_GOOGLECLOUDDNS_PROJECT ?? "";
+  const zone = cfg.password ?? process.env.DDNS_GOOGLECLOUDDNS_ZONE ?? "";
+  return new GoogleclouddnsProvider({ clientEmail, privateKeyPem, project, zone, baseUrl: cfg.baseUrl });
+}

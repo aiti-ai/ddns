@@ -10,7 +10,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 
 const { DreamhostProvider, DondominioProvider, NetcupProvider, NamesiloProvider, SpaceshipProvider, NamecheapProvider, DnsmadeeasyProvider, UltradnsProvider, ConstellixProvider, DnsservicesProvider } = await import("../src/providers/special.ts");
-const { AuroraProvider, CloudxnsProvider, YandexProvider, TransipProvider, QcloudProvider, HostingdeProvider, WedosProvider, NfsnProvider, YandexcloudProvider, ValuedomainProvider, RackspaceProvider, MemsetProvider, GehirnProvider, RcodezeroProvider, DevnomadsProvider, MisakaProvider, DinahostingProvider, JokerProvider, PowerdnsProvider, DirectadminProvider, InfobloxProvider, AzureProvider, OciProvider, SoftlayerProvider, PleskProvider, EuservProvider, LocalzoneProvider, EasynameProvider, GransyProvider, HoverProvider } = await import("../src/providers/lexicon-more.ts");
+const { AuroraProvider, CloudxnsProvider, YandexProvider, TransipProvider, QcloudProvider, HostingdeProvider, WedosProvider, NfsnProvider, YandexcloudProvider, ValuedomainProvider, RackspaceProvider, MemsetProvider, GehirnProvider, RcodezeroProvider, DevnomadsProvider, MisakaProvider, DinahostingProvider, JokerProvider, PowerdnsProvider, DirectadminProvider, InfobloxProvider, AzureProvider, OciProvider, SoftlayerProvider, PleskProvider, EuservProvider, LocalzoneProvider, EasynameProvider, GransyProvider, HoverProvider, GoogleclouddnsProvider } = await import("../src/providers/lexicon-more.ts");
 const { Route53Provider, awsSigV4 } = await import("../src/providers/route53.ts");
 const { GcpProvider } = await import("../src/providers/gcp.ts");
 
@@ -1012,6 +1012,38 @@ test("hover: cookie session (session + auth) + control_panel/dns", async () => {
     assert.equal(listed[0].value, "1.1.1.1");
     const dnsCall = seen.find((c) => c.url.includes("/dns/"));
     assert.ok(dnsCall.cookie.includes("hover_session=s1"));
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ----------------------------- googleclouddns ----------------------------- */
+
+test("googleclouddns: JWT service-account flow + Cloud DNS rrsets", async () => {
+  const seen = [];
+  const srv = await listen((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      seen.push({ url: req.url, auth: req.headers.authorization, body });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url.includes("oauth2.googleapis.com/token")) res.end(JSON.stringify({ access_token: "tok1" }));
+      else if (req.url.includes("/rrsets") && req.method === "GET") res.end(JSON.stringify({ rrsets: [{ name: "home.example.com.", type: "A", ttl: 300, rrdatas: ["1.1.1.1"] }] }));
+      else res.end(JSON.stringify({}));
+    });
+  });
+  try {
+    const { generateKeyPairSync } = await import("node:crypto");
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" });
+    const p = new GoogleclouddnsProvider({ clientEmail: "svc@example.com", privateKeyPem: pem, project: "proj1", zone: "example-com", baseUrl: urlOf(srv), authUrl: urlOf(srv) + "/oauth2.googleapis.com/token" });
+    const listed = await p.listRecords("example.com");
+    assert.equal(listed[0].value, "1.1.1.1");
+    // JWT assertion sent to token endpoint, then Bearer used
+    const tokenCall = seen.find((c) => c.url.includes("token"));
+    assert.ok(tokenCall.body.includes("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer"));
+    const rrsetCall = seen.find((c) => c.url.includes("/rrsets"));
+    assert.equal(rrsetCall.auth, "Bearer tok1");
   } finally {
     await new Promise((r) => srv.close(r));
   }

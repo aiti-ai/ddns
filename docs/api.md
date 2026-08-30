@@ -2,7 +2,7 @@
 
 本文档是 ddns 的对外接口契约。**修改接口时必须同步更新本文档。**
 
-版本：0.1.0 ｜ 119 家 provider ｜ 142 测试全绿
+版本：0.1.0 ｜ 120 家 provider ｜ 143 测试全绿
 
 ---
 
@@ -247,7 +247,7 @@ url/ipv4key/ipv6key/successRegex，按 provider 声明，含 required/type/link 
 
 ---
 
-## 4. 供应商清单（119 家）
+## 4. 供应商清单（120 家）
 
 | 类别 | provider 名 |
 |---|---|

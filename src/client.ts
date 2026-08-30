@@ -10,7 +10,7 @@ import { createDuckdns } from "./providers/duckdns/index.ts";
 import { createCustom } from "./providers/custom/index.ts";
 import { createFreedns } from "./providers/freedns/index.ts";
 import { createDreamhost, createDondominio, createNetcup, createNamesilo, createSpaceship, createNamecheap, createDnsmadeeasy, createUltradns, createConstellix, createDnsservices } from "./providers/special.ts";
-import { createAurora, createCloudxns, createYandex, createGratisdns, createTransip, createQcloud, createHostingde, createHttpnet, createWedos, createNfsn, createYandexcloud, createValuedomain, createRackspace, createMemset, createGehirn, createRcodezero, createDevnomads, createMisaka, createDinahosting, createJoker, createPowerdns, createDirectadmin, createInfoblox, createAzure, createOci, createSoftlayer, createPlesk, createEuserv, createLocalzone, createEasyname, createGransy, createHover } from "./providers/lexicon-more.ts";
+import { createAurora, createCloudxns, createYandex, createGratisdns, createTransip, createQcloud, createHostingde, createHttpnet, createWedos, createNfsn, createYandexcloud, createValuedomain, createRackspace, createMemset, createGehirn, createRcodezero, createDevnomads, createMisaka, createDinahosting, createJoker, createPowerdns, createDirectadmin, createInfoblox, createAzure, createOci, createSoftlayer, createPlesk, createEuserv, createLocalzone, createEasyname, createGransy, createHover, createGoogleclouddns } from "./providers/lexicon-more.ts";
 import { createRoute53 } from "./providers/route53.ts";
 import { createGcp } from "./providers/gcp.ts";
 import { normalizeName } from "./providers/common.ts";
@@ -78,6 +78,7 @@ export function createProvider(cfg: ProviderConfig): DnsProvider {
     case "easyname": return createEasyname(cfg);
     case "gransy": return createGransy(cfg);
     case "hover": return createHover(cfg);
+    case "googleclouddns": return createGoogleclouddns(cfg);
     case "linode4": return createLinodeAlias(cfg);
     case "zeit": return createVercelAlias(cfg);
     case "dreamhost": return createDreamhost(cfg);
