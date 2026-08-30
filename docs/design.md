@@ -72,7 +72,7 @@ resolver 不走 NSS），但：
 - 内置 CA/服务端证书在 `src/mocks/assets/`（10 年有效期，仅测试用）；
 - Python lexicon（requests）同样认 `HTTPS_PROXY` + `REQUESTS_CA_BUNDLE`。
 
-## 5. 测试矩阵（101 用例，全离线）
+## 5. 测试矩阵（105 用例，全离线）
 
 | 文件 | 覆盖 | 对齐 |
 |---|---|---|
@@ -90,7 +90,7 @@ resolver 不走 NSS），但：
 - service-tunnels 集成：`beacon` API + tunnel url 事件联动（远端服务器无人值守
   注册当前 tunnel 域名的完整闭环）。
 
-## 7. 供应商全景（72 家，对齐 Go ddns-updater 全量 + lexicon 补充）
+## 7. 供应商全景（76 家，对齐 Go ddns-updater 全量 + lexicon 补充）
 
 | 类别 | 数量 | 实现 |
 |---|---|---|

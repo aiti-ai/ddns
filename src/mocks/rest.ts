@@ -82,6 +82,7 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
       record: r.value, // cloudns-style string record
       rdata: r.value,
       records: [r.value], // flexibleengine recordsets style
+      answers: [{ answer: [r.value] }], // nsone rr-set style
       // nested record object (pointhq style)
       record_details: { id: r.id, record_type: r.type, name: r.name, data: r.value, ttl: r.ttl ?? 300 },
       // sakuracloud deep nesting
@@ -100,9 +101,10 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
     if (saku) b = saku;
     // b.record may be a string (cloudns) or a nested object (pointhq)
     const recField = typeof b.record === "string" ? b.record : (b.record as Record<string, unknown> | undefined)?.data;
+    const nsoneAnswer = (b.answers as Array<{ answer?: string[] }> | undefined)?.[0]?.answer?.[0];
     const val = String(
       b.data ?? b.content ?? b.target ?? b.answer ?? b.value ?? b.Value ?? b.RData ??
-      recField ?? (b.records as string[])?.[0] ?? (b.rrset_values as string[])?.[0] ?? "",
+      nsoneAnswer ?? recField ?? (b.records as string[])?.[0] ?? (b.rrset_values as string[])?.[0] ?? "",
     );
     let name = nameFromPath ?? String(b.name ?? b.host ?? b.Name ?? (b.record as Record<string, unknown> | undefined)?.name ?? "");
     // short names ("home", host-only) are joined with the mock's zone; "@"

@@ -886,4 +886,117 @@ export const REST_SPECS: RestSpec[] = [
     },
     delete: { path: (z, id) => `/v2/domains/${z}/records/${id}` },
   },
+
+  // nsone (NS1): /zones/:zone/:name/:type — records are rr-sets addressed by
+  // name+type (composite id), value = answers[] (first answer)
+  {
+    name: "nsone",
+    baseUrl: "https://api.nsone.net/v1",
+    auth: { type: "header", header: "X-NSONE-Key", cfgField: "token", env: "DDNS_NSONE_TOKEN" },
+    list: { path: (z) => `/zones/${z}`, recordsPath: ["records"] },
+    fields: {
+      id: (r) => String(r.name ?? r.domain ?? "") + "/" + String(r.type ?? ""),
+      type: (r) => String(r.type ?? ""),
+      name: (r) => String(r.name ?? r.domain ?? ""),
+      value: (r) => String((r.answers as Array<{ answer?: string[] }> | undefined)?.[0]?.answer?.[0] ?? ""),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z, _zid, rec) => `/zones/${z}/{name}/${rec.type}`,
+      body: (z, rec) => ({ zone: z, domain: rec.name, type: rec.type, answers: [{ answer: [rec.value] }], ttl: rec.ttl ?? 300 }),
+      method: "PUT",
+    },
+    update: {
+      path: (z, id) => {
+        const [name] = id.split("/");
+        return `/zones/${z}/{name}/{type}`;
+      },
+      body: (z, rec) => ({ zone: z, domain: rec.name, type: rec.type, answers: [{ answer: [rec.value] }], ttl: rec.ttl ?? 300 }),
+      method: "PUT",
+    },
+    delete: {
+      path: (z, id) => {
+        const [name] = id.split("/");
+        return `/zones/${z}/{name}/{type}`;
+      },
+    },
+  },
+
+  // safedns: /zones/:zone/records
+  {
+    name: "safedns",
+    baseUrl: "https://api.ukfast.io/safedns/v1",
+    auth: { type: "header", header: "Authorization", cfgField: "token", env: "DDNS_SAFEDNS_TOKEN" },
+    list: { path: (z) => `/zones/${z}/records`, recordsPath: ["records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.content),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/zones/${z}/records`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, content: rec.value, ttl: rec.ttl ?? 300 }),
+      idPath: ["id"],
+    },
+    update: {
+      path: (z, id) => `/zones/${z}/records/${id}`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, content: rec.value, ttl: rec.ttl ?? 300 }),
+      method: "PATCH",
+    },
+    delete: { path: (z, id) => `/zones/${z}/records/${id}` },
+  },
+
+  // zilore: /domains/:zone/records (Bearer)
+  {
+    name: "zilore",
+    baseUrl: "https://api.zilore.com/dns/v1",
+    auth: { type: "bearer", cfgField: "token", env: "DDNS_ZILORE_TOKEN" },
+    list: { path: (z) => `/domains/${z}/records`, recordsPath: ["records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.content),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/domains/${z}/records`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, content: rec.value, ttl: rec.ttl ?? 300 }),
+      idPath: ["id"],
+    },
+    update: {
+      path: (z, id) => `/domains/${z}/records/${id}`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, content: rec.value, ttl: rec.ttl ?? 300 }),
+      method: "PUT",
+    },
+    delete: { path: (z, id) => `/domains/${z}/records/${id}` },
+  },
+
+  // mythicbeasts: /dns/v2/zones/:zone/records (Bearer token)
+  {
+    name: "mythicbeasts",
+    baseUrl: "https://api.mythic-beasts.com/dns/v2",
+    auth: { type: "bearer", cfgField: "token", env: "DDNS_MYTHICBEASTS_TOKEN" },
+    list: { path: (z) => `/zones/${z}/records`, recordsPath: ["records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name ?? r.host ?? ""),
+      value: (r) => String(r.data ?? r.content),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/zones/${z}/records`,
+      body: (z, rec) => ({ type: rec.type, host: rec.name, data: rec.value, ttl: rec.ttl ?? 300 }),
+      idPath: ["id"],
+    },
+    update: {
+      path: (z, id) => `/zones/${z}/records/${id}`,
+      body: (z, rec) => ({ type: rec.type, host: rec.name, data: rec.value, ttl: rec.ttl ?? 300 }),
+      method: "PUT",
+    },
+    delete: { path: (z, id) => `/zones/${z}/records/${id}` },
+  },
 ];export const REST_SPEC_NAMES: string[] = REST_SPECS.map((s) => s.name);
