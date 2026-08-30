@@ -153,6 +153,19 @@ test("serve: status API reports entries + last run; POST /update triggers", asyn
     assert.equal(res2.status, 200);
     assert.equal(JSON.parse(res2.body)[0].name, "d");
 
+    // WebUI root serves HTML
+    const web = await new Promise((resolve, reject) => {
+      httpRequest(`${serve.url}/`, (res) => {
+        let d = "";
+        res.on("data", (c) => (d += c));
+        res.on("end", () => resolve({ status: res.statusCode, ct: res.headers["content-type"], body: d }));
+      }).on("error", reject).end();
+    });
+    assert.equal(web.status, 200);
+    assert.match(web.ct, /text\/html/);
+    assert.match(web.body, /<h1>ddns<\/h1>/);
+    assert.match(web.body, /Update now/);
+
     // unknown path → 404
     const res3 = await new Promise((resolve, reject) => {
       httpRequest(`${serve.url}/nope`, (res) => {

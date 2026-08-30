@@ -4,13 +4,13 @@
   "description": "DDNS + DNS record management, multi-provider. Merges ddns-updater (Go) record-value updates with lexicon (Python) arbitrary record CRUD — every provider ships a mock implementation so the full flow is testable offline.",
   "type": "module",
   "bin": {
-    "ddns": "./dist/cli.js",
-    "ddns-cli": "./dist/cli.js"
+    "ddns": "./src/cli.ts",
+    "ddns-cli": "./src/cli.ts"
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     },
     "./src/*.ts": "./src/*.ts",
     "./package.json": "./package.json"
