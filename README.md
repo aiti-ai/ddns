@@ -100,14 +100,16 @@ LD_PRELOAD。详见 `docs/design.md`。
 ## 开发
 
 ```bash
+npm run verify   # 一键验证（推荐）：环境检查 → 依赖安装 → typecheck → 全量测试 → build
+                # 从全新 clone（无 node_modules）直接跑即全绿，无需任何手工准备
 npm run typecheck   # tsc --noEmit
-npm test            # node --test（18 用例，全离线：mock + 注入 fetch）
+npm test            # node --test（24 用例，全离线：mock + 注入 fetch）
 npm run build       # tsc → dist/
 ```
 
-测试对齐两家项目的断言：cloudflare/dnspod/duckdns/custom 同时覆盖 Go 与 lexicon 的
-请求形状，aliyun 完全按 Go（lexicon 无 aliyun），`test/tls-proxy.test.mjs` 模拟 Go
-客户端 CONNECT→TLS→HTTP 全流程。详见 `docs/design.md` 的对照表。
+测试对齐两家项目的断言：cloudflare/dnspod/duckdns/custom/freedns 同时覆盖 Go 与
+lexicon 的请求形状，aliyun 完全按 Go（lexicon 无 aliyun），`test/tls-proxy.test.mjs`
+模拟 Go 客户端 CONNECT→TLS→HTTP 全流程。详见 `docs/design.md` 的对照表。
 
 ## 许可
 
