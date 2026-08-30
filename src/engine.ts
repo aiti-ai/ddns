@@ -5,6 +5,7 @@
 
 import type { FetchLike, ProviderName } from "./types.ts";
 import { resolvePublicIp } from "./ip.ts";
+import { normalizeName } from "./providers/common.ts";
 import { createProvider, isPushProvider, type ProviderLike } from "./client.ts";
 
 export interface DdnsEntry {
@@ -46,7 +47,7 @@ export interface DdnsResult {
   type: "A" | "AAAA";
   ip: string | null;
   changed: boolean;
-  skipped?: "disabled" | "no-ip" | "unchanged";
+  skipped?: "disabled" | "no-ip" | "unchanged" | "busy";
   error?: string;
 }
 
@@ -74,11 +75,11 @@ export async function updateEntry(entry: DdnsEntry, deps: DdnsDeps = {}): Promis
   };
   if (entry.enabled === false) return { ...base, skipped: "disabled" };
 
-  const ip = entry.ip ?? (type === "AAAA" ? await detectIp(6, fetchImpl) : await detectIp(4, fetchImpl));
-  if (!ip) return { ...base, skipped: "no-ip" };
-  base.ip = ip;
-
   try {
+    const ip = entry.ip ?? (type === "AAAA" ? await detectIp(6, fetchImpl) : await detectIp(4, fetchImpl));
+    if (!ip) return { ...base, skipped: "no-ip" };
+    base.ip = ip;
+
     const provider = createProvider(entry);
     if (isPushProvider(provider)) {
       // duckdns / custom webhook: no readback, push unconditionally
@@ -88,8 +89,12 @@ export async function updateEntry(entry: DdnsEntry, deps: DdnsDeps = {}): Promis
     const zone = entry.zone;
     if (!zone) throw new Error(`provider '${entry.provider}' is zone-style — entry '${entry.name}' needs zone`);
     const existing = await provider.listRecords(zone, { type, name: entry.record });
-    const match = existing.find((r) => r.type === type && r.name === entry.record);
-    if (match && match.value === ip) return { ...base, skipped: "unchanged" }; // Go: up-to-date
+    const match = existing.find((r) => r.type === type && normalizeName(r.name) === normalizeName(entry.record));
+    const ttlSame = match === undefined || entry.ttl === undefined || match.ttl === entry.ttl;
+    const proxiedSame = match === undefined || entry.proxied === undefined || match.proxied === entry.proxied;
+    if (match && match.value === ip && ttlSame && proxiedSame) {
+      return { ...base, skipped: "unchanged" }; // Go: up-to-date
+    }
     if (match) {
       await provider.updateRecord(zone, { type, name: entry.record, value: ip, ttl: entry.ttl, proxied: entry.proxied }, match.id!);
     } else {
@@ -117,12 +122,25 @@ export interface DdnsLoopHandle {
  *  alive only through active work). */
 export function startLoop(entries: DdnsEntry[], deps: DdnsDeps = {}): DdnsLoopHandle {
   const log = deps.log ?? (() => {});
-  const interval = Math.max(30, Math.min(...entries.map((e) => e.intervalSec ?? 300), Number.MAX_SAFE_INTEGER)) * 1000;
+  if (!entries.length) {
+    return {
+      runOnce: async () => [],
+      stop() {},
+    };
+  }
+  const interval = Math.min(86_400, Math.max(30, Math.min(...entries.map((e) => e.intervalSec ?? 300)))) * 1000;
   let timer: ReturnType<typeof setInterval> | null = null;
   let running = false;
 
   const tick = async (): Promise<DdnsResult[]> => {
-    if (running) return [];
+    if (running) {
+      // A run is already in flight — report it instead of silently dropping
+      // the trigger (serve's POST /update can distinguish busy from idle).
+      return entries.map((e) => ({
+        name: e.name, provider: e.provider, record: e.record, type: e.type ?? "A",
+        ip: null, changed: false, skipped: "busy" as const,
+      }));
+    }
     running = true;
     try {
       const results = await runOnce(entries, deps);

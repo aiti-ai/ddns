@@ -29,7 +29,7 @@ export type {
 
 export { resolvePublicIp, isValidIp, IPV4_SOURCES, IPV6_SOURCES } from "./ip.ts";
 
-export { ProviderError, splitZone, formEncode, defaultFetch } from "./providers/common.ts";
+export { ProviderError, splitZone, formEncode, defaultFetch, normalizeName } from "./providers/common.ts";
 
 export { createProvider, isPushProvider, isZoneProvider, listRecords, createRecord, updateRecord, deleteRecord, deleteRecordByName, upsertRecord } from "./client.ts";
 

@@ -18,6 +18,13 @@ export class ProviderError extends Error {
   }
 }
 
+/** Normalize a DNS name for comparison: lowercase + strip trailing dot.
+ *  DNS names are case-insensitive and FQDNs conventionally end with "." —
+ *  config values like "Home.example.com." must match provider responses. */
+export function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/\.$/, "");
+}
+
 /** Split an FQDN into [owner, rootZone] given the root zone. Mirrors
  *  lexicon's `name_to_zone` semantics:
  *    splitZone("home.example.com", "example.com") → ["home", "example.com"]
@@ -29,18 +36,6 @@ export function splitZone(record: string, zone: string): [string, string] {
   if (r === z) return ["@", z];
   if (r.endsWith(`.${z}`)) return [r.slice(0, -(z.length + 1)), z];
   throw new ProviderError(`record '${record}' is not under zone '${zone}'`, "core");
-}
-
-/** HTTP helpers shared by providers. */
-export async function httpJson(fetchImpl: FetchLike, url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; json: unknown }> {
-  const res = await fetchImpl(url, init);
-  let json: unknown = null;
-  try {
-    json = await res.json();
-  } catch {
-    // non-JSON body — leave null
-  }
-  return { status: res.status, json };
 }
 
 /** Form-encode an object (dnspod uses application/x-www-form-urlencoded). */

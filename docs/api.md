@@ -2,7 +2,7 @@
 
 本文档是 ddns 的对外接口契约。**修改接口时必须同步更新本文档。**
 
-版本：0.1.0 ｜ 69 家 provider ｜ 97 测试全绿
+版本：0.1.0 ｜ 72 家 provider ｜ 101 测试全绿
 
 ---
 
@@ -247,7 +247,7 @@ url/ipv4key/ipv6key/successRegex，按 provider 声明，含 required/type/link 
 
 ---
 
-## 4. 供应商清单（69 家唯一名）
+## 4. 供应商清单（72 家）
 
 | 类别 | provider 名 |
 |---|---|
@@ -255,7 +255,7 @@ url/ipv4key/ipv6key/successRegex，按 provider 声明，含 required/type/link 
 | REST zone API（Go 侧） | digitalocean · gandi · godaddy · hostinger · ionos · linode · luadns · namecom · porkbun · scaleway · servercow · vultr · hetznercloud · bunny |
 | dyndns2 | allinkl · changeip · dd24 · ddnss · dnsomatic · dyn · dynu · dynv6 · easydns · gigahostno · goip · he · infomaniak · inwx · ipv64 · loopia · myaddr · namecheap · njalla · noip · nowdns · opendns · ovh · selfhostde · spdyn · strato · variomedia · zoneedit |
 | 特例 | dreamhost · dondominio · netcup · namesilo · spaceship · route53(SigV4) · gcp(OAuth) |
-| lexicon 补充 | dnsimple · cloudns · glesys · regfish · internetbs · pointhq · rage4 · online · timeweb · zonomi · dnspark · flexibleengine · conoha · sakuracloud（dreamhost/dondominio 与特例共享） |
+| lexicon 补充 | dnsimple · cloudns · glesys · regfish · internetbs · pointhq · rage4 · online · timeweb · zonomi · dnspark · flexibleengine · conoha · sakuracloud · hetzner · vercel（dreamhost/dondominio 与特例共享） |
 
 环境变量约定：`DDNS_<PROVIDER_UPPER>_TOKEN` / `_SECRET` / `_ACCESS_KEY_ID` / `_USERNAME` / `_PASSWORD` 等（如 `DDNS_CLOUDFLARE_TOKEN`、`DDNS_ALIYUN_ACCESS_KEY_SECRET`）。
 

@@ -63,7 +63,12 @@ export async function startDnspodMock(opts: DnspodMockOptions = {}): Promise<Dns
           if (domain) records = records.filter((r) => r.name.endsWith(`.${domain}`) || r.name === domain);
           if (sub && sub !== "@") records = records.filter((r) => r.name.split(".")[0] === sub);
           if (type) records = records.filter((r) => r.type === type);
-          return ok(res, { records });
+          // real DNSPod returns the SHORT label as "name" (not the FQDN)
+          const shaped = records.map((r) => ({
+            ...r,
+            name: r.name === domain ? "@" : r.name.replace(`.${domain}`, ""),
+          }));
+          return ok(res, { records: shaped });
         }
         case "Record.Create": {
           const domain = params.get("domain") ?? "";

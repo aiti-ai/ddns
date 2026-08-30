@@ -1,5 +1,6 @@
 /** duckdns — token-based update-only endpoint (Go ddns-updater's duckdns +
- *  lexicon's duckdns: both GET /v3/update?domains=&token=&ip=, response
+ *  lexicon's duckdns: GET /update?domains=&token=&ip= (official path, Go and
+ *  lexicon both hit /update — NOT /v3/update), response
  *  "OK"/"KO"). Style: push — records are managed on the duckdns website. */
 
 import type { FetchLike, ProviderConfig, PushProvider } from "../../types.ts";
@@ -38,7 +39,7 @@ export class DuckdnsProvider implements PushProvider {
     const p = new URLSearchParams({ domains: rec.name, token: this.#token });
     if (rec.type === "A") p.set("ip", rec.value);
     else p.set("ipv6", rec.value);
-    const res = await this.#fetch(`${this.#base}/v3/update?${p.toString()}`);
+    const res = await this.#fetch(`${this.#base}/update?${p.toString()}`);
     const out = (await res.text()).trim().toUpperCase();
     if (out !== "OK") {
       throw new ProviderError(`duckdns update failed: ${out || `HTTP ${res.status}`}`, "duckdns", res.status);

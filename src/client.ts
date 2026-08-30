@@ -9,9 +9,10 @@ import { createAliyun } from "./providers/aliyun/index.ts";
 import { createDuckdns } from "./providers/duckdns/index.ts";
 import { createCustom } from "./providers/custom/index.ts";
 import { createFreedns } from "./providers/freedns/index.ts";
-import { createDreamhost, createDondominio, createNetcup, createNamesilo, createSpaceship } from "./providers/special.ts";
+import { createDreamhost, createDondominio, createNetcup, createNamesilo, createSpaceship, createNamecheap } from "./providers/special.ts";
 import { createRoute53 } from "./providers/route53.ts";
 import { createGcp } from "./providers/gcp.ts";
+import { normalizeName } from "./providers/common.ts";
 import { registry } from "./plugins.ts";
 import { RestProvider } from "./providers/rest.ts";
 import { REST_SPECS } from "./providers/rest-specs.ts";
@@ -38,6 +39,7 @@ export function createProvider(cfg: ProviderConfig): DnsProvider {
     case "duckdns": return createDuckdns(cfg);
     case "custom": return createCustom(cfg);
     case "freedns": return createFreedns(cfg);
+    case "namecheap": return createNamecheap(cfg);
     case "dreamhost": return createDreamhost(cfg);
     case "dondominio": return createDondominio(cfg);
     case "netcup": return createNetcup(cfg);
@@ -109,7 +111,7 @@ export async function upsertRecord(
   const p = createProvider(cfg);
   if (isPushProvider(p)) throw new Error(`provider '${cfg.provider}' is push-style — it has no upsert`);
   const found = await p.listRecords(zone, { type: rec.type, name: rec.name });
-  const match = found.find((r) => r.type === rec.type && r.name === rec.name);
+  const match = found.find((r) => r.type === rec.type && normalizeName(r.name) === normalizeName(rec.name));
   if (match) {
     await p.updateRecord(zone, rec, match.id!);
     return { created: false };

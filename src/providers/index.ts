@@ -6,6 +6,6 @@ export { AliyunProvider, createAliyun, aliyunCanonicalQuery, aliyunStringToSign,
 export { DuckdnsProvider, createDuckdns } from "./duckdns/index.ts";
 export { CustomProvider, createCustom } from "./custom/index.ts";
 export { FreednsProvider, createFreedns } from "./freedns/index.ts";
-export { DreamhostProvider, DondominioProvider, NetcupProvider, NamesiloProvider, SpaceshipProvider, createDreamhost, createDondominio, createNetcup, createNamesilo, createSpaceship } from "./special.ts";
+export { DreamhostProvider, DondominioProvider, NetcupProvider, NamesiloProvider, SpaceshipProvider, NamecheapProvider, createDreamhost, createDondominio, createNetcup, createNamesilo, createSpaceship, createNamecheap } from "./special.ts";
 export { Route53Provider, awsSigV4, createRoute53 } from "./route53.ts";
 export { GcpProvider, createGcp } from "./gcp.ts";

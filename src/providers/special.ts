@@ -265,6 +265,41 @@ export class NamesiloProvider implements ZoneProvider {
   }
 }
 
+/* ------------------------------- namecheap ------------------------------ */
+
+/** namecheap — dynamic DNS via query params (NOT basic auth):
+ *  GET https://dynamicdns.park-your-domain.com/update?host=<label>&domain=<zone>
+ *     &password=<32hex>&ip=<ip>
+ *  Responses: "good <ip>", "nochg <ip>", "badauth", "nohost", "911". */
+export class NamecheapProvider implements PushProvider {
+  readonly meta = { name: "namecheap", style: "push", recordTypes: ["A", "AAAA"], needsZone: false, authFields: ["token (32-hex Dynamic DNS password)"], params: [] } as const;
+  readonly #password: string;
+  readonly #base: string;
+  readonly #fetch: FetchLike;
+
+  constructor(opts: { password: string; baseUrl?: string; fetchImpl?: FetchLike }) {
+    if (!opts.password) throw new ProviderError("namecheap requires the 32-hex Dynamic DNS password", "namecheap");
+    this.#password = opts.password;
+    this.#base = opts.baseUrl ?? "https://dynamicdns.park-your-domain.com";
+    this.#fetch = opts.fetchImpl ?? defaultFetchImpl;
+  }
+
+  async pushValue(rec: { name: string; type: "A" | "AAAA"; value: string }): Promise<void> {
+    // rec.name is a full FQDN; namecheap wants host (label) + domain (root)
+    const dot = rec.name.indexOf(".");
+    const host = dot < 0 ? "@" : rec.name.slice(0, dot);
+    const domain = dot < 0 ? rec.name : rec.name.slice(dot + 1);
+    const q = new URLSearchParams({ host, domain, password: this.#password, ip: rec.value });
+    const res = await this.#fetch(`${this.#base}/update?${q.toString()}`);
+    const body = (await res.text()).trim().toLowerCase();
+    if (body.startsWith("good") || body.startsWith("nochg")) return;
+    if (body.startsWith("badauth") || body.startsWith("nohost") || body.startsWith("911") || body.startsWith("badagent")) {
+      throw new ProviderError(`namecheap rejected: ${body}`, "namecheap", res.status);
+    }
+    throw new ProviderError(`namecheap unknown response: ${body}`, "namecheap", res.status);
+  }
+}
+
 /* ------------------------------- spaceship ------------------------------ */
 
 /** spaceship: REST https://api.spaceship.dev/ with X-API-Key + X-API-Secret. */
@@ -342,6 +377,11 @@ export function createNamesilo(cfg: ProviderConfig): NamesiloProvider {
   const key = cfg.token ?? process.env.DDNS_NAMESILO_KEY;
   if (!key) throw new ProviderError("namesilo requires cfg.token (API key)", "namesilo");
   return new NamesiloProvider({ key, baseUrl: cfg.baseUrl });
+}
+
+export function createNamecheap(cfg: ProviderConfig): NamecheapProvider {
+  const password = cfg.token ?? process.env.DDNS_NAMECHEAP_PASSWORD ?? "";
+  return new NamecheapProvider({ password, baseUrl: cfg.baseUrl });
 }
 
 export function createSpaceship(cfg: ProviderConfig): SpaceshipProvider {

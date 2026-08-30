@@ -70,14 +70,17 @@ export class DnspodProvider implements ZoneProvider {
   async listRecords(zone: string, filter?: ListFilter): Promise<DnsRecord[]> {
     const data = await this.#api("Record.List", {
       domain: zone,
-      sub_domain: filter?.name ?? undefined,
+      // DNSPod's Record.List takes the SHORT label (or "@" for the apex);
+      // the response "name" is likewise the label — rebuild the FQDN here.
+      sub_domain: filter?.name ? labelOf(filter.name, zone) : undefined,
       record_type: filter?.type ?? undefined,
+      length: "200",
     });
     const records = (data.records ?? []) as DnspodRecord[];
     return (Array.isArray(records) ? records : []).map((r) => ({
       id: String(r.id),
       type: r.type,
-      name: r.name,
+      name: r.name === "@" || r.name === zone ? zone : `${r.name}.${zone}`,
       value: r.value,
       ttl: r.ttl !== undefined ? Number(r.ttl) : undefined,
     }));
@@ -122,6 +125,15 @@ const defaultFetchImpl: FetchLike = (url, init) =>
     text: () => r.text(),
     json: () => r.json(),
   }));
+
+/** FQDN → DNSPod label ("home.example.com", "example.com" → "home"/"@"). */
+function labelOf(name: string, zone: string): string {
+  const r = name.toLowerCase().replace(/\.$/, "");
+  const z = zone.toLowerCase().replace(/\.$/, "");
+  if (r === z) return "@";
+  if (r.endsWith(`.${z}`)) return r.slice(0, -(z.length + 1));
+  throw new ProviderError(`record '${name}' is not under zone '${zone}'`, "dnspod");
+}
 
 function splitOwner(name: string, zone: string): [string] {
   const r = name.toLowerCase().replace(/\.$/, "");

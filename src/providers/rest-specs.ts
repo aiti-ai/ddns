@@ -85,7 +85,7 @@ export const REST_SPECS: RestSpec[] = [
     name: "godaddy",
     idOrder: "type-name",
     baseUrl: "https://api.godaddy.com/v1",
-    auth: { type: "header", header: "Authorization", cfgField: "token", env: "DDNS_GODADDY_TOKEN" },
+    auth: { type: "header", header: "Authorization", headerPrefix: "sso-key ", cfgField: "token", env: "DDNS_GODADDY_TOKEN" },
     list: {
       path: (z) => `/domains/${z}/records`,
       recordsPath: [],
@@ -276,10 +276,14 @@ export const REST_SPECS: RestSpec[] = [
   {
     name: "porkbun",
     baseUrl: "https://api.porkbun.com/api/json/v3",
-    auth: { type: "query", queryKey: "x", cfgField: "token" },
+    auth: { type: "body", cfgField: "token", bodyKeys: [
+      { key: "apikey", cfgField: "token", env: "DDNS_PORKBUN_API_KEY" },
+      { key: "secretapikey", cfgField: "secret", env: "DDNS_PORKBUN_SECRET_API_KEY" },
+    ] },
     list: {
       path: (z) => `/dns/retrieve/${z}`,
       recordsPath: ["records"],
+      method: "POST",
     },
     fields: {
       id: (r) => String(r.id),
@@ -474,7 +478,8 @@ export const REST_SPECS: RestSpec[] = [
   {
     name: "cloudns",
     baseUrl: "https://api.cloudns.net",
-    auth: { type: "query", queryKey: "auth-id", cfgField: "token" },
+    auth: { type: "query", queryKey: "auth-id", cfgField: "token", env: "DDNS_CLOUDNS_AUTH_ID",
+            secondQuery: { key: "auth-password", cfgField: "secret", env: "DDNS_CLOUDNS_AUTH_PASSWORD" } },
     list: { path: (z) => `/dns/records.json?domain-name=${z}`, recordsPath: [] },
     fields: {
       id: (r) => String(r.id),
@@ -829,5 +834,56 @@ export const REST_SPECS: RestSpec[] = [
       method: "PUT",
     },
     delete: { path: (z, id) => `/zone/${z}/record/${id}` },
+  },
+
+  // hetzner: dns.hetzner.com/api/v1/records (Auth-Api-Token) — NOT dyndns
+  {
+    name: "hetzner",
+    baseUrl: "https://dns.hetzner.com/api/v1",
+    auth: { type: "header", header: "Auth-Api-Token", cfgField: "token", env: "DDNS_HETZNER_TOKEN" },
+    list: { path: () => `/records`, recordsPath: ["records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.value),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: () => `/records`,
+      body: (z, rec) => ({ zone_id: z, type: rec.type, name: rec.name.split(".")[0] === "@" ? "" : rec.name, value: rec.value, ttl: rec.ttl ?? 300 }),
+      idPath: ["record", "id"],
+    },
+    update: {
+      path: (_z, id) => `/records/${id}`,
+      body: (z, rec) => ({ zone_id: z, type: rec.type, name: rec.name.split(".")[0] === "@" ? "" : rec.name, value: rec.value, ttl: rec.ttl ?? 300 }),
+    },
+    delete: { path: (_z, id) => `/records/${id}` },
+  },
+
+  // vercel: api.vercel.com (Bearer) — v2/domains/:zone/records
+  {
+    name: "vercel",
+    baseUrl: "https://api.vercel.com",
+    auth: { type: "bearer", cfgField: "token", env: "DDNS_VERCEL_TOKEN" },
+    list: { path: (z) => `/v2/domains/${z}/records`, recordsPath: ["records"] },
+    fields: {
+      id: (r) => String(r.id),
+      type: (r) => String(r.type),
+      name: (r) => String(r.name),
+      value: (r) => String(r.value),
+      ttl: (r) => (r.ttl !== undefined ? Number(r.ttl) : undefined),
+    },
+    create: {
+      path: (z) => `/v2/domains/${z}/records`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, value: rec.value, ttl: rec.ttl ?? 60 }),
+      idPath: ["record", "id"],
+    },
+    update: {
+      path: (z, id) => `/v2/domains/${z}/records/${id}`,
+      body: (z, rec) => ({ type: rec.type, name: rec.name, value: rec.value, ttl: rec.ttl ?? 60 }),
+      method: "PATCH",
+    },
+    delete: { path: (z, id) => `/v2/domains/${z}/records/${id}` },
   },
 ];export const REST_SPEC_NAMES: string[] = REST_SPECS.map((s) => s.name);

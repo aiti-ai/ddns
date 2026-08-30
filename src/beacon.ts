@@ -9,6 +9,7 @@
 
 import type { ProviderConfig, RecordType, ZoneProvider } from "./types.ts";
 import { createProvider, isZoneProvider } from "./client.ts";
+import { normalizeName } from "./providers/common.ts";
 
 export type BeaconType = "CNAME" | "TXT";
 
@@ -40,9 +41,11 @@ export function beaconValue(input: string, type: BeaconType): string {
   if (type === "CNAME") {
     try {
       const u = new URL(input.includes("://") ? input : `http://${input}`);
-      return u.host;
+      if (u.port) throw new Error("CNAME target must not carry a port");
+      return normalizeName(u.host);
     } catch {
-      return input.replace(/^https?:\/\//, "").split("/")[0] ?? input;
+      const stripped = input.replace(/^https?:\/\//, "").split("/")[0] ?? input;
+      return normalizeName(stripped);
     }
   }
   return input;
@@ -57,8 +60,8 @@ export async function setBeacon(opts: BeaconOptions): Promise<BeaconResult> {
     throw new Error(`beacon requires a zone-style provider (got '${opts.provider.provider}', style '${p.meta.style}')`);
   }
   const found = await p.listRecords(opts.zone, { type, name: opts.name });
-  const match = found.find((r) => r.type === type && r.name === opts.name);
-  if (match && match.value === value) {
+  const match = found.find((r) => r.type === type && normalizeName(r.name) === normalizeName(opts.name));
+  if (match && normalizeName(match.value) === normalizeName(value)) {
     return { name: opts.name, type, value, created: false }; // already in sync
   }
   if (match) {

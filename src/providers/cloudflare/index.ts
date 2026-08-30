@@ -3,7 +3,7 @@
  *  /zones/:id/dns_records, plus zone lookup by name). */
 
 import type { DnsRecord, FetchLike, ListFilter, ProviderConfig, ZoneProvider } from "../../types.ts";
-import { ProviderError, baseUrl, httpJson } from "../common.ts";
+import { ProviderError, baseUrl } from "../common.ts";
 
 const OFFICIAL = "https://api.cloudflare.com/client/v4";
 

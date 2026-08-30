@@ -54,11 +54,16 @@ export async function startServe(opts: ServeOptions): Promise<ServeHandle> {
       return;
     }
     if (url.pathname === "/update" && req.method === "POST") {
-      void loop.runOnce().then((results) => {
-        const body = JSON.stringify(results, null, 2);
-        res.writeHead(200, { "content-length": Buffer.byteLength(body) });
-        res.end(body);
-      });
+      void loop.runOnce()
+        .then((results) => {
+          const body = JSON.stringify(results, null, 2);
+          res.writeHead(200, { "content-length": Buffer.byteLength(body) });
+          res.end(body);
+        })
+        .catch((err) => {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+        });
       return;
     }
     res.writeHead(404);

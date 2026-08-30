@@ -41,9 +41,9 @@ for (const spec of REST_SPECS) {
       await p.deleteRecord("example.com", rid);
       assert.equal((await p.listRecords("example.com")).length, 0, `${spec.name} delete applied`);
 
-      // auth is enforced (query-style auth like porkbun is body-level and
-      // can't be checked by the generic mock — skip those)
-      if (spec.auth.type !== "query") {
+      // auth is enforced (query/body-style auth like porkbun/cloudns is
+      // checked provider-side, not by the generic mock — skip those)
+      if (spec.auth.type !== "query" && spec.auth.type !== "body") {
         const bad = new RestProvider(spec, { provider: spec.name, token: "wrong", baseUrl: mock.url });
         await assert.rejects(() => bad.listRecords("example.com"), /401|unauthorized/i);
       }

@@ -15,11 +15,18 @@ import type { DnsRecord, FetchLike, ListFilter, ParamSpec, ProviderConfig, ZoneP
 import { ProviderError } from "./common.ts";
 
 export interface RestAuth {
-  type: "bearer" | "header" | "query" | "basic";
+  type: "bearer" | "header" | "query" | "basic" | "body";
   /** Header name for type "header" (e.g. "X-API-Key"). */
   header?: string;
+  /** Literal prefix before the credential in the header value
+   *  (godaddy: "sso-key " → "Authorization: sso-key <key>:<secret>"). */
+  headerPrefix?: string;
   /** Query key for type "query" (e.g. "key"). */
   queryKey?: string;
+  /** Extra query param for type "query" (cloudns: auth-password). */
+  secondQuery?: { key: string; cfgField: "token" | "secret"; env?: string };
+  /** Body keys for type "body" (porkbun: {secretapikey, apikey}). */
+  bodyKeys?: { key: string; cfgField: "token" | "secret"; env?: string }[];
   /** Config field holding the credential (token / secret / accessKeyId). */
   cfgField: "token" | "secret" | "accessKeyId";
   /** Env var fallback name. */
@@ -46,6 +53,8 @@ export interface RestSpec {
   /** Record list. */
   list: {
     path: (zone: string, zoneId?: string, preId?: string) => string;
+    /** HTTP method (default GET; body-auth APIs like porkbun use POST). */
+    method?: string;
     /** JSON path to the record array, e.g. ["records"] or ["data"]. */
     recordsPath: string[];
     /** Optional: object wrapper, e.g. ["domain_records"] for linode pages. */
@@ -78,22 +87,19 @@ export interface RestSpec {
     path: (zone: string, id: string, zoneId?: string, preId?: string) => string;
     method?: string;
   };
-  /** Optional: filter the list result by name (for APIs that don't filter). */
-  filterByName?: boolean;
   /** Composite record-id order: "name-type" (gandi: "home/A") or
    *  "type-name" (godaddy: "A/home"). Default "name-type". */
   idOrder?: "name-type" | "type-name";
   /** Mock stores the record id as its name (APIs that address records by
    *  name, e.g. sakuracloud /zone/:z/record/:Name). */
   idFromName?: boolean;
-  /** Optional: treat 404 on update as create (some APIs auto-create). */
-  updateCreates?: boolean;
 }
 
 export class RestProvider implements ZoneProvider {
   readonly meta: { name: string; style: "zone"; recordTypes: string[]; needsZone: true; authFields: string[]; params: readonly ParamSpec[] };
 
   readonly #spec: RestSpec;
+  readonly #cfg: ProviderConfig;
   readonly #cred: string;
   readonly #base: string;
   readonly #fetch: FetchLike;
@@ -104,6 +110,7 @@ export class RestProvider implements ZoneProvider {
     const cred = cfg[spec.auth.cfgField] ?? (spec.auth.env ? process.env[spec.auth.env] : undefined);
     if (!cred) throw new ProviderError(`provider '${spec.name}' requires ${spec.auth.cfgField}`, spec.name);
     this.#spec = spec;
+    this.#cfg = cfg;
     this.#cred = cred;
     this.#base = cfg.baseUrl ?? spec.baseUrl;
     this.#fetch = fetchImpl ?? defaultFetchImpl;
@@ -121,7 +128,7 @@ export class RestProvider implements ZoneProvider {
     const h: Record<string, string> = { "user-agent": "ddns/0.1" };
     const a = this.#spec.auth;
     if (a.type === "bearer") h.authorization = `Bearer ${this.#cred}`;
-    else if (a.type === "header") h[a.header ?? "X-API-Key"] = this.#cred;
+    else if (a.type === "header") h[a.header ?? "X-API-Key"] = `${a.headerPrefix ?? ""}${this.#cred}`;
     else if (a.type === "basic") h.authorization = `Basic ${Buffer.from(this.#cred).toString("base64")}`;
     if (json) h["content-type"] = "application/json";
     return h;
@@ -130,7 +137,18 @@ export class RestProvider implements ZoneProvider {
   #url(path: string): string {
     if (this.#spec.auth.type !== "query") return `${this.#base}${path}`;
     const sep = path.includes("?") ? "&" : "?";
-    return `${this.#base}${path}${sep}${this.#spec.auth.queryKey}=${encodeURIComponent(this.#cred)}`;
+    const a = this.#spec.auth;
+    let q = `${a.queryKey}=${encodeURIComponent(this.#cred)}`;
+    if (a.secondQuery) {
+      const v = this.#cred2(a.secondQuery);
+      q += `&${a.secondQuery.key}=${encodeURIComponent(v)}`;
+    }
+    return `${this.#base}${path}${sep}${q}`;
+  }
+
+  #cred2(extra: { cfgField: "token" | "secret"; env?: string }): string {
+    const cfg = this.#cfg;
+    return String(cfg[extra.cfgField] ?? (extra.env ? process.env[extra.env] : undefined) ?? "");
   }
 
   async #preId(name: string, path: () => string, idPath: string): Promise<string> {
@@ -169,10 +187,18 @@ export class RestProvider implements ZoneProvider {
   }
 
   async #req(method: string, path: string, body?: unknown): Promise<{ status: number; json: unknown }> {
+    const a = this.#spec.auth;
+    let effectiveBody = body;
+    if (a.type === "body" && a.bodyKeys) {
+      // body-auth APIs (porkbun) carry credentials in every request body
+      const creds: Record<string, unknown> = {};
+      for (const k of a.bodyKeys) creds[k.key] = this.#cred2(k);
+      effectiveBody = { ...(body as Record<string, unknown> ?? {}), ...creds };
+    }
     const res = await this.#fetch(this.#url(path), {
       method,
-      headers: this.#headers(body !== undefined),
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers: this.#headers(effectiveBody !== undefined),
+      body: effectiveBody !== undefined ? JSON.stringify(effectiveBody) : undefined,
     });
     let json: unknown = null;
     try {
@@ -180,7 +206,7 @@ export class RestProvider implements ZoneProvider {
     } catch {
       // non-JSON
     }
-    if (!res.ok && !(this.#spec.updateCreates && method === "PUT" && res.status === 404)) {
+    if (!res.ok) {
       throw new ProviderError(`${this.#spec.name} API error HTTP ${res.status}`, this.#spec.name, res.status);
     }
     return { status: res.status, json };
@@ -189,7 +215,7 @@ export class RestProvider implements ZoneProvider {
   async listRecords(zone: string, filter?: ListFilter): Promise<DnsRecord[]> {
     const ids = await this.#lookupIds(zone);
     const zid = ids.at(-1);
-    const { json } = await this.#req("GET", this.#spec.list.path(zone, zid, ids.at(0)));
+    const { json } = await this.#req(this.#spec.list.method ?? "GET", this.#spec.list.path(zone, zid, ids.at(0)));
     let arr = getPath(json as Record<string, unknown>, this.#spec.list.recordsPath);
     if (this.#spec.list.pagesPath && !Array.isArray(arr)) {
       arr = getPath(json as Record<string, unknown>, this.#spec.list.pagesPath);
@@ -209,7 +235,7 @@ export class RestProvider implements ZoneProvider {
       return rec;
     });
     if (filter?.type) out = out.filter((r) => r.type === filter.type);
-    if (filter?.name) out = out.filter((r) => r.name === filter.name || (this.#spec.filterByName && r.name.endsWith(`.${filter.name}`)));
+    if (filter?.name) out = out.filter((r) => r.name === filter.name);
     return out;
   }
 

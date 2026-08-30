@@ -122,7 +122,7 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
     const a = spec.auth;
     const expected = opts.cred ?? "test-token";
     if (a.type === "bearer") return req.headers.authorization === `Bearer ${expected}`;
-    if (a.type === "header") return req.headers[(a.header ?? "x-api-key").toLowerCase()] === expected;
+    if (a.type === "header") return req.headers[(a.header ?? "x-api-key").toLowerCase()] === `${a.headerPrefix ?? ""}${expected}`;
     if (a.type === "basic") return req.headers.authorization === `Basic ${Buffer.from(expected).toString("base64")}`;
     return true; // query/body auth — skip in generic mock
   };
@@ -186,7 +186,8 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
 
       // list (query-stripped compare; empty recordsPath = bare array body)
       const listTpl = spec.list.path(zone, zoneId, "acct1");
-      if (method === "GET" && (p === stripQuery(spec.list.path(zone, zoneId)) || p === stripQuery(listTpl))) {
+      const listMethod = spec.list.method ?? "GET";
+      if (method === listMethod && (p === stripQuery(spec.list.path(zone, zoneId)) || p === stripQuery(listTpl))) {
         const shaped = state.records.map(apiShape);
         if (spec.list.recordsPath.length === 0) return json(res, 200, shaped);
         const wrapped: Record<string, unknown> = {};

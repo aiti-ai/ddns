@@ -23,7 +23,6 @@ export const DYNDNS_SERVICES: DyndnsSpec[] = [
   { name: "ipv64", url: "https://ipv64.net/nic/update", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
   { name: "loopia", url: "https://dyndns.loopia.se/", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
   { name: "myaddr", url: "https://myaddr.tools/update", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
-  { name: "namecheap", url: "https://dynamicdns.park-your-domain.com/update", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
   { name: "njalla", url: "https://njal.la/update/", userField: "token", tokenOnly: true, successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
   { name: "noip", url: "https://dynupdate.no-ip.com/nic/update", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
   { name: "nowdns", url: "https://now-dns.com/update", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
@@ -34,6 +33,8 @@ export const DYNDNS_SERVICES: DyndnsSpec[] = [
   { name: "strato", url: "https://dyndns.strato.com/nic/update", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
   { name: "variomedia", url: "https://variomedia.de/nic/update", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
   { name: "zoneedit", url: "https://api.cp.zoneedit.com/dyn/generic.php", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
+  { name: "desec", url: "https://update.dedyn.io/", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
+  { name: "domeneshop", url: "https://api.domeneshop.no/v0/dyndns/update", userField: "username", successPrefixes: ["good", "nochg"], noChangePrefixes: ["nochg"] },
 ];
 
 /** All dyndns2 service names (for registry/CLI listing). */

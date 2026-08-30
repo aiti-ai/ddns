@@ -9,7 +9,7 @@ import test from "node:test";
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 
-const { DreamhostProvider, DondominioProvider, NetcupProvider, NamesiloProvider, SpaceshipProvider } = await import("../src/providers/special.ts");
+const { DreamhostProvider, DondominioProvider, NetcupProvider, NamesiloProvider, SpaceshipProvider, NamecheapProvider } = await import("../src/providers/special.ts");
 const { Route53Provider, awsSigV4 } = await import("../src/providers/route53.ts");
 const { GcpProvider } = await import("../src/providers/gcp.ts");
 
@@ -177,6 +177,32 @@ test("spaceship: X-API-Key + X-API-Secret headers on CRUD", async () => {
     assert.equal(seen[0].secret, "as");
     const created = await p.createRecord("example.com", { type: "A", name: "x.example.com", value: "2.2.2.2" });
     assert.equal(created.id, "r2");
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+/* ------------------------------- namecheap ------------------------------ */
+
+test("namecheap: query-param auth (host/domain/password/ip), good/nochg + rejection", async () => {
+  const calls = [];
+  const srv = await listen((req, res) => {
+    const u = new URL(req.url, "http://x");
+    calls.push(Object.fromEntries(u.searchParams));
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end(u.searchParams.get("password") === "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6" ? "good 203.0.113.9" : "badauth");
+  });
+  try {
+    const p = new NamecheapProvider({ password: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6", baseUrl: urlOf(srv) });
+    await p.pushValue({ name: "home.example.com", type: "A", value: "203.0.113.9" });
+    assert.equal(calls[0].host, "home");
+    assert.equal(calls[0].domain, "example.com");
+    assert.equal(calls[0].ip, "203.0.113.9");
+    assert.equal(calls[0].password, "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6");
+
+    // bad password → badauth rejection
+    const p2 = new NamecheapProvider({ password: "wrong", baseUrl: urlOf(srv) });
+    await assert.rejects(() => p2.pushValue({ name: "h.example.com", type: "A", value: "1.2.3.4" }), /badauth/);
   } finally {
     await new Promise((r) => srv.close(r));
   }
