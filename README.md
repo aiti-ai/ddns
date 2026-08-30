@@ -112,7 +112,7 @@ LD_PRELOAD。详见 `docs/design.md`。
 npm run verify   # 一键验证（推荐）：环境检查 → 依赖安装 → typecheck → 全量测试 → build
                 # 从全新 clone（无 node_modules）直接跑即全绿，无需任何手工准备
 npm run typecheck   # tsc --noEmit
-npm test            # node --test（143 用例，全离线：mock + 注入 fetch）
+npm test            # node --test（144 用例，全离线：mock + 注入 fetch）
 npm run build       # tsc → dist/
 ```
 

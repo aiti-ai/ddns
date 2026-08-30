@@ -72,7 +72,7 @@ resolver 不走 NSS），但：
 - 内置 CA/服务端证书在 `src/mocks/assets/`（10 年有效期，仅测试用）；
 - Python lexicon（requests）同样认 `HTTPS_PROXY` + `REQUESTS_CA_BUNDLE`。
 
-## 5. 测试矩阵（143 用例，全离线）
+## 5. 测试矩阵（144 用例，全离线）
 
 | 文件 | 覆盖 | 对齐 |
 |---|---|---|
@@ -92,14 +92,8 @@ cloudxns/dnsmadeeasy/constellix）、OAuth（azure/gcp）、SOAP（gransy）、
 XML-RPC（plesk）、cookie 会话（hover/easyname/euserv）、本地 zone 文件
 （localzone）、dyndns2（28 家）。
 
----|---|---|---|
-| 云厂商 SDK 签名 | 2 | oci · softlayer | 官方 SDK 内签名（OCI Signer / SoftLayer XML-RPC） |
-| 浏览器会话 | 4 | henet · easyname · hover · euserv | 需 cookie 会话模拟（脆弱，无稳定 API） |
-| SOAP | 1 | gransy | SOAP/WSDL（zeep） |
-| 面板 XML-RPC | 1 | plesk | XML-RPC 深集成（hosting-cli） |
-| 本地测试工具 | 1 | localzone | 非真实 provider（本地 DNS 测试） |
-
----|---|---|
+---
+|---|---|
 | 云厂商 SDK 级 | 3 | azure(OAuth) · oci(Sig) · softlayer(XML-RPC SDK) |
 | 面板/网页会话 | 5 | directadmin · plesk · henet(网页) · easyname(网页) · hover(cookie 会话) |
 | SOAP/本地 | 2 | gransy(SOAP) · localzone(本地测试工具) |
