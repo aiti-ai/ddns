@@ -3,8 +3,7 @@
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
-import type { RestSpec } from "../providers/rest.ts";
-import { getPath } from "../providers/rest.ts";
+import type { RestSpec } from "@aiti-ti/ddns";
 
 export interface RestMockOptions {
   spec: RestSpec;
@@ -310,4 +309,3 @@ function setPath(obj: Record<string, unknown>, path: string[], value: unknown): 
   cur[path[path.length - 1]!] = value;
 }
 
-void getPath; // (re-exported helper; kept for API symmetry)

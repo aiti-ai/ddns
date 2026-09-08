@@ -7,11 +7,13 @@
  *   - lexicon (Python, dns-lexicon): arbitrary record CRUD (A/AAAA/CNAME/
  *     TXT/MX…) against zone-style provider APIs (cloudflare, dnspod, aliyun).
  *
- *  Every provider ships an in-memory mock (src/mocks) that mirrors the real
- *  provider HTTP API closely enough for third-party implementations (Go
- *  ddns-updater, Python lexicon) pointed at it to work too — including a
- *  TLS + CONNECT proxy face (src/mocks/tls.ts) for statically-linked Go
- *  binaries that hardcode provider hostnames.
+ *  Every provider ships an in-memory mock that mirrors the real provider
+ *  HTTP API closely enough for third-party implementations (Go ddns-updater,
+ *  Python lexicon) pointed at it to work too — including a TLS + CONNECT
+ *  proxy face for statically-linked Go binaries that hardcode provider
+ *  hostnames. The mocks live in the separate package @aiti-ti/ddns-mocks
+ *  (repo: mocks/), NOT in this runtime package; the `ddns mock` CLI command
+ *  loads them lazily (install @aiti-ti/ddns-mocks to use it).
  */
 
 export type {
@@ -70,41 +72,4 @@ export { configPath, readConfig, writeConfig } from "./config.ts";
 
 export { providerSchema, providerMetas, providerMeta } from "./schemas.ts";
 
-// -- mocks (each provider has one; TLS proxy face included) --
-export {
-  startCloudflareMock,
-  startDnspodMock,
-  startAliyunMock,
-  startDuckdnsMock,
-  startCustomMock,
-  startFreednsMock,
-  startMockProvider,
-  startAllMocks,
-  startTlsProxy,
-  caCertPath,
-  serverCertPath,
-} from "./mocks/index.ts";
-export type {
-  CloudflareMockHandle,
-  CloudflareMockOptions,
-  CloudflareMockState,
-  DnspodMockHandle,
-  DnspodMockOptions,
-  DnspodMockState,
-  AliyunMockHandle,
-  AliyunMockOptions,
-  AliyunMockState,
-  DuckdnsMockHandle,
-  DuckdnsMockOptions,
-  DuckdnsMockState,
-  CustomMockHandle,
-  CustomMockOptions,
-  CustomMockState,
-  FreednsMockHandle,
-  FreednsMockOptions,
-  FreednsMockState,
-  MockProviderName,
-  MockOptionsMap,
-  AllMocksHandle,
-} from "./mocks/index.ts";
-export type { TlsProxyHandle } from "./mocks/tls.ts";
+export type { RestSpec } from "./providers/rest.ts";

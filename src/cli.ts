@@ -7,11 +7,12 @@ import { listRecords, createRecord as clientCreate, updateRecord as clientUpdate
 import { runOnce, startLoop } from "./engine.ts";
 import { readConfig, configPath } from "./config.ts";
 import { resolvePublicIp } from "./ip.ts";
-import { startMockProvider, startTlsProxy, type MockProviderName } from "./mocks/index.ts";
 import { discoverPlugins } from "./plugins.ts";
 
 import { REST_SPEC_NAMES } from "./providers/rest-specs.ts";
 import { DYNDNS_SERVICE_NAMES } from "./providers/dyndns-services.ts";
+
+type MockProviderName = string; // CLI mock 参数（类型就地声明，不引 mocks 包）
 
 const PROVIDERS = ["cloudflare", "dnspod", "aliyun", "duckdns", "custom", "freedns", "dreamhost", "dondominio", "netcup", "namesilo", "spaceship", "route53", "gcp", ...REST_SPEC_NAMES, ...DYNDNS_SERVICE_NAMES];
 
@@ -148,6 +149,19 @@ async function main(): Promise<void> {
     }
 
     case "mock": {
+      // mocks 独立包 @aiti-ti/ddns-mocks（不在运行时依赖里）：懒加载，未装给提示
+      let mocks: {
+        startMockProvider: (name: string, opts: Record<string, unknown>) => Promise<{ url: string }>;
+        startTlsProxy: (url: string) => Promise<{ tlsUrl: string; proxyUrl: string; caPath: string }>;
+      };
+      try {
+        mocks = await import("@aiti-ti/ddns-mocks");
+      } catch {
+        console.error(
+          "@aiti-ti/ddns-mocks 未安装——`ddns mock` 需要它。安装：npm i -D @aiti-ti/ddns-mocks（或 npm i @aiti-ti/ddns-mocks）",
+        );
+        process.exit(2);
+      }
       const provider = cmd[1] as MockProviderName | undefined;
       if (provider && !PROVIDERS.includes(provider)) {
         console.error(`unknown provider: ${provider} (known: ${PROVIDERS.join(", ")})`);
@@ -156,10 +170,10 @@ async function main(): Promise<void> {
       const names: MockProviderName[] = provider ? [provider] : [...PROVIDERS];
       const started: unknown[] = [];
       for (const n of names) {
-        const h = await startMockProvider(n, { zone: args.zone ?? "example.com", port: args.port } as never);
+        const h = await mocks.startMockProvider(n, { zone: args.zone ?? "example.com", port: args.port } as never);
         const entry: Record<string, unknown> = { provider: n, url: h.url };
         if (args.tlsProxy) {
-          const tls = await startTlsProxy(h.url);
+          const tls = await mocks.startTlsProxy(h.url);
           entry.tlsUrl = tls.tlsUrl;
           entry.proxyUrl = tls.proxyUrl;
           entry.caPath = tls.caPath;

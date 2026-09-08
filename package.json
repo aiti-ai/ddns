@@ -1,6 +1,6 @@
 {
   "name": "@aiti-ti/ddns",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "DDNS + DNS record management, multi-provider. Merges ddns-updater (Go) record-value updates with lexicon (Python) arbitrary record CRUD — every provider ships a mock implementation so the full flow is testable offline.",
   "type": "module",
   "bin": {
@@ -12,9 +12,17 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./mocks/*": {
-      "types": "./dist/mocks/*.d.ts",
-      "default": "./dist/mocks/*.js"
+    "./plugins": {
+      "types": "./dist/plugins.d.ts",
+      "default": "./dist/plugins.js"
+    },
+    "./rest-specs": {
+      "types": "./dist/providers/rest-specs.d.ts",
+      "default": "./dist/providers/rest-specs.js"
+    },
+    "./dyndns-services": {
+      "types": "./dist/providers/dyndns-services.d.ts",
+      "default": "./dist/providers/dyndns-services.js"
     },
     "./package.json": "./package.json"
   },
@@ -51,6 +59,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^26.1.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "@aiti-ti/ddns-mocks": "file:mocks"
   }
 }

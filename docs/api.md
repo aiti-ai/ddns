@@ -159,7 +159,7 @@ class ProviderError extends Error {
 }
 ```
 
-### 1.7 Mock 体系（`src/mocks/`）
+### 1.7 Mock 体系（独立包 `@aiti-ti/ddns-mocks`，repo `mocks/`）
 
 ```ts
 startMockProvider(name, opts?): Promise<AnyMockHandle>   // 任意已注册 provider

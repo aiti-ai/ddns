@@ -12,8 +12,8 @@ const { updateEntry, runOnce, startLoop } = await import("../src/engine.ts");
 const { upsertRecord, createProvider, isPushProvider, isZoneProvider } = await import("../src/client.ts");
 const { readConfig, writeConfig, configPath } = await import("../src/config.ts");
 const { resolvePublicIp } = await import("../src/ip.ts");
-const { startCloudflareMock } = await import("../src/mocks/cloudflare.ts");
-const { startDuckdnsMock } = await import("../src/mocks/duckdns.ts");
+const { startCloudflareMock } = await import("@aiti-ti/ddns-mocks");
+const { startDuckdnsMock } = await import("@aiti-ti/ddns-mocks");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

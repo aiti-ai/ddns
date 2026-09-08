@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.ts");
-const { startCloudflareMock } = await import("../src/mocks/cloudflare.ts");
-const { startDuckdnsMock } = await import("../src/mocks/duckdns.ts");
+const { startCloudflareMock } = await import("@aiti-ti/ddns-mocks");
+const { startDuckdnsMock } = await import("@aiti-ti/ddns-mocks");
 
 function run(args) {
   return new Promise((resolve) => {

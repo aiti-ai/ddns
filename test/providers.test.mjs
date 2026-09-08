@@ -10,11 +10,11 @@ const { DnspodProvider } = await import("../src/providers/dnspod/index.ts");
 const { AliyunProvider } = await import("../src/providers/aliyun/index.ts");
 const { DuckdnsProvider } = await import("../src/providers/duckdns/index.ts");
 const { CustomProvider } = await import("../src/providers/custom/index.ts");
-const { startCloudflareMock } = await import("../src/mocks/cloudflare.ts");
-const { startDnspodMock } = await import("../src/mocks/dnspod.ts");
-const { startAliyunMock } = await import("../src/mocks/aliyun.ts");
-const { startDuckdnsMock } = await import("../src/mocks/duckdns.ts");
-const { startCustomMock } = await import("../src/mocks/custom.ts");
+const { startCloudflareMock } = await import("@aiti-ti/ddns-mocks");
+const { startDnspodMock } = await import("@aiti-ti/ddns-mocks");
+const { startAliyunMock } = await import("@aiti-ti/ddns-mocks");
+const { startDuckdnsMock } = await import("@aiti-ti/ddns-mocks");
+const { startCustomMock } = await import("@aiti-ti/ddns-mocks");
 
 /* ----------------------------- cloudflare ------------------------------ */
 

@@ -3,8 +3,25 @@
  *  so signature bugs surface in tests. */
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import { randomUUID } from "node:crypto";
-import { aliyunSign } from "../providers/aliyun/index.ts";
+import { randomUUID, createHmac } from "node:crypto";
+
+
+// ── aliyun 签名链（内联自 ddns core，mock 钉死真实 wire 行为）──
+function aliyunPercent(s: string): string {
+  return encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+function aliyunCanonicalQuery(params: Record<string, string>): string {
+  return Object.entries(params)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${aliyunPercent(k)}=${aliyunPercent(v)}`)
+    .join("&");
+}
+function aliyunStringToSign(params: Record<string, string>): string {
+  return `GET&%2F&${aliyunPercent(aliyunCanonicalQuery(params))}`;
+}
+function aliyunSign(accessKeySecret: string, params: Record<string, string>): string {
+  return createHmac("sha1", `${accessKeySecret}&`).update(aliyunStringToSign(params)).digest("base64");
+}
 
 export interface AliyunMockOptions {
   accessKeyId?: string;
