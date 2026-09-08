@@ -24,9 +24,11 @@ import { startCustomMock, type CustomMockHandle, type CustomMockOptions } from "
 import { startFreednsMock, type FreednsMockHandle, type FreednsMockOptions } from "./freedns.ts";
 import { startRestMock, type RestMockHandle, type RestMockOptions } from "./rest.ts";
 import { startDyndnsMock, type DyndnsMockHandle, type DyndnsMockOptions } from "./dyndns.ts";
+import { startLooseZoneMock, type LooseMockHandle, type LooseMockOptions } from "./loose.ts";
+import { startRoute53Mock, type Route53MockHandle, type Route53MockOptions } from "./route53.ts";
 import { registry } from "../plugins.ts";
 
-export type AnyMockHandle = CloudflareMockHandle | DnspodMockHandle | AliyunMockHandle | DuckdnsMockHandle | CustomMockHandle | FreednsMockHandle | RestMockHandle | DyndnsMockHandle;
+export type AnyMockHandle = CloudflareMockHandle | DnspodMockHandle | AliyunMockHandle | DuckdnsMockHandle | CustomMockHandle | FreednsMockHandle | RestMockHandle | DyndnsMockHandle | LooseMockHandle | Route53MockHandle;
 
 export type MockOptionsMap = {
   cloudflare: CloudflareMockOptions;
@@ -45,8 +47,9 @@ export async function startMockFor(name: string, opts: { zone?: string; cred?: s
   const rest = REST_SPECS.find((s) => s.name === name);
   if (rest) return startRestMock({ spec: rest, zone: opts.zone ?? "example.com", cred: opts.cred, records: opts.records, port: opts.port });
   const dyn = DYNDNS_SERVICES.find((s) => s.name === name);
-  if (dyn) return startDyndnsMock({ auth: dyn.tokenOnly ? undefined : "user:pass", okText: "good", port: opts.port });
-  throw new Error(`unknown provider for mock: ${name}`);
+  if (dyn) return startDyndnsMock({ auth: dyn.tokenOnly ? undefined : "user:pass", okText: `${dyn.successPrefixes[0] ?? "good"} 1.2.3.4`, port: opts.port });
+  // hand-written providers without a dedicated mock: loose zone REST mock
+  return startLooseZoneMock({ provider: name, auth: "none", cred: "test-token", ...(opts.zone ? { zone: opts.zone } : {}), ...(opts.records ? { records: opts.records } : {}), ...(opts.port ? { port: opts.port } : {}) });
 }
 
 export async function startMockProvider(name: MockProviderName, opts: Record<string, unknown> = {}): Promise<AnyMockHandle> {
@@ -57,6 +60,7 @@ export async function startMockProvider(name: MockProviderName, opts: Record<str
     case "duckdns": return startDuckdnsMock(opts as DuckdnsMockOptions);
     case "custom": return startCustomMock(opts as CustomMockOptions);
     case "freedns": return startFreednsMock(opts as FreednsMockOptions);
+    case "route53": return startRoute53Mock(opts as Route53MockOptions);
     default: {
       const pluginMock = registry.getMock(name);
       if (pluginMock) return pluginMock(opts as { zone?: string; cred?: string; port?: number }) as AnyMockHandle;

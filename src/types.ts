@@ -111,6 +111,8 @@ export interface ProviderConfig {
   password?: string;
   /** Base URL override (tests point providers at their mocks). */
   baseUrl?: string;
+  /** OAuth/JWT token authority (azure) — separate from baseUrl, points at the mock in tests. */
+  authUrl?: string;
   /** localzone: zone file path. */
   zone?: string;
 }

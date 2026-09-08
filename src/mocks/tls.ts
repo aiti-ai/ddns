@@ -58,11 +58,15 @@ export interface TlsProxyHandle {
 }
 
 /** Wrap a running mock (its plain-HTTP `url`) with a TLS face + a CONNECT
- *  proxy face. `target` is the mock's base URL (http://127.0.0.1:<port>). */
-export async function startTlsProxy(target: string): Promise<TlsProxyHandle> {
+ *  proxy face. `target` is the mock's base URL (http://127.0.0.1:<port>).
+ *  Pass `certs` (dir containing ca.pem/ca.key/srv.pem/srv.key) to override the
+ *  bundled assets — verify-all uses a freshly generated CA whose SAN covers
+ *  every provider hostname WITHOUT clobbering the committed test assets. */
+export async function startTlsProxy(target: string, certs?: { dir: string }): Promise<TlsProxyHandle> {
   const targetUrl = new URL(target);
-  const key = readFileSync(join(ASSETS, "mock-server.key"), "utf8");
-  const cert = readFileSync(serverCertPath(), "utf8");
+  const dir = certs?.dir ?? ASSETS;
+  const key = readFileSync(join(dir, certs ? "srv.key" : "mock-server.key"), "utf8");
+  const cert = readFileSync(join(dir, certs ? "srv.pem" : "mock-server.pem"), "utf8");
 
   // --- TLS face: terminates TLS, forwards the plain HTTP request to the mock
   const tlsServer: TlsServer = createTlsServer({ key, cert }, (req, res) => {

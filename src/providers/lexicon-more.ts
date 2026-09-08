@@ -1773,7 +1773,7 @@ export function createAzure(cfg: ProviderConfig): AzureProvider {
   const tenantId = cfg.password ?? process.env.DDNS_AZURE_TENANT_ID ?? "";
   const subscriptionId = cfg.accessKeyId ?? process.env.DDNS_AZURE_SUBSCRIPTION_ID ?? "";
   const resourceGroup = cfg.zoneId ?? process.env.DDNS_AZURE_RESOURCE_GROUP ?? "";
-  return new AzureProvider({ clientId, clientSecret, tenantId, subscriptionId, resourceGroup, baseUrl: cfg.baseUrl });
+  return new AzureProvider({ clientId, clientSecret, tenantId, subscriptionId, resourceGroup, baseUrl: cfg.baseUrl, authUrl: cfg.authUrl });
 }
 
 /* ---------------------------------- oci ---------------------------------- */
@@ -2568,5 +2568,5 @@ export function createGoogleclouddns(cfg: ProviderConfig): GoogleclouddnsProvide
   const privateKeyPem = cfg.token ?? process.env.DDNS_GOOGLECLOUDDNS_PRIVATE_KEY ?? "";
   const project = cfg.secret ?? process.env.DDNS_GOOGLECLOUDDNS_PROJECT ?? "";
   const zone = cfg.password ?? process.env.DDNS_GOOGLECLOUDDNS_ZONE ?? "";
-  return new GoogleclouddnsProvider({ clientEmail, privateKeyPem, project, zone, baseUrl: cfg.baseUrl });
+  return new GoogleclouddnsProvider({ clientEmail, privateKeyPem, project, zone, baseUrl: cfg.baseUrl, authUrl: cfg.authUrl });
 }

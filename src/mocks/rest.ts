@@ -109,7 +109,7 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
       b.data ?? b.content ?? b.target ?? b.answer ?? b.value ?? b.Value ?? b.RData ??
       nsoneAnswer ?? recField ?? (b.records as string[])?.[0] ?? (b.rrset_values as string[])?.[0] ?? "",
     );
-    let name = nameFromPath ?? String(b.name ?? b.host ?? b.Name ?? (b.record as Record<string, unknown> | undefined)?.name ?? "");
+    let name = nameFromPath ?? String(b.name ?? b.host ?? b.Name ?? b.domain ?? (b.record as Record<string, unknown> | undefined)?.name ?? "");
     // short names ("home", host-only) are joined with the mock's zone; "@"
     // (root) stays as-is; full fqdns pass through
     if (name && name !== "@" && !name.includes(".")) name = `${name}.${zone}`;
@@ -213,10 +213,20 @@ export async function startRestMock(opts: RestMockOptions): Promise<RestMockHand
       // create: matches POST to the collection path, or the create template
       // with {name}/{type} placeholders (gandi-style)
       const createTemplate = spec.create.path(zone, zoneId, { name: "x", type: "A", value: "x" } as never, "acct1");
+      // nsone-style create paths embed the record TYPE as a real segment
+      // (`/zones/:z/{name}/:type`) — dummy-expanded template fixes the type,
+      // so also match with the type segment wildcarded. Only meaningful when the
+      // create template is a PURE path (no query string) — otherwise the replace
+      // would strip the query and produce a bare `/path/{type}` that falsely
+      // matches unrelated endpoints (e.g. zonomi's `/dns/delete.jsp`).
+      const createTypeFlex = createTemplate.includes("?")
+        ? ""
+        : createTemplate.replace(/\/[^/]+\/?$/, "/{type}");
       const createMatch = p === stripQuery(spec.list.path(zone, zoneId))
         || p === stripQuery(spec.create.path(zone, zoneId, { name: "x", type: "A", value: "x" } as never))
         || p === stripQuery(createTemplate)
-        || pathRegex(createTemplate).test(p);
+        || pathRegex(createTemplate).test(p)
+        || (createTypeFlex ? pathRegex(createTypeFlex).test(p) : false);
       if (method === (spec.create.method ?? "POST") && createMatch) {
         const cap = pathRegex(createTemplate).exec(p);
         const std = stdRec(parsed, cap?.[1], cap?.[2]);
