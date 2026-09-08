@@ -1,6 +1,6 @@
 {
   "name": "@aiti-ti/ddns",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "DDNS + DNS record management, multi-provider. Merges ddns-updater (Go) record-value updates with lexicon (Python) arbitrary record CRUD — every provider ships a mock implementation so the full flow is testable offline.",
   "type": "module",
   "bin": {
@@ -11,6 +11,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./mocks/*": {
+      "types": "./dist/mocks/*.d.ts",
+      "default": "./dist/mocks/*.js"
     },
     "./package.json": "./package.json"
   },
