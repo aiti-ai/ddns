@@ -1,8 +1,8 @@
-# publish-npm.yml — publish @aiti-ai/ddns to the npm official registry
-# (registry.npmjs.org). Single-package variant of the aiti-ai/aiti-ai
-# publish-npm.yml decision matrix: this repo ships one package, so the
-# content-hash skip / auto-bump machinery is unnecessary — the version is
-# bumped manually on release.
+# publish-npm.yml — publish @aiti-ai/ddns (+ the @aiti-ai/ddns-mocks subpackage)
+# to the npm official registry (registry.npmjs.org). Two jobs:
+#   mocks  — builds & publishes mocks/ (@aiti-ai/ddns-mocks) first
+#   ddns   — the runtime package; runs after mocks (consumers' devDependencies
+#            resolve @aiti-ai/ddns-mocks from the registry)
 #
 # Trigger: workflow_dispatch (manual)
 #   dry_run: true (default) — preflight + typecheck + tests + build + pack
@@ -10,8 +10,7 @@
 #   false — publish for real.
 #
 # Auth: NPM_TOKEN secret (granular automation token with packages read/write
-# on the @aiti-ti scope — note: the @aiti-ai-scope token used by the other
-# repos does NOT cover this package).
+# on the @aiti-ai scope — same token family the other aiti-ai repos use).
 # Upgrade path (token-free): npmjs Trusted Publishing (OIDC) — bind the
 # package on npmjs.com to this repo + workflow file, then publish with
 # --provenance and drop the NPM_TOKEN env. Kept as a comment until the
@@ -36,7 +35,40 @@ permissions:
   id-token: write # npm provenance (official publishes carry --provenance once Trusted Publishing is bound)
 
 jobs:
+  mocks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mocks
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Preflight — registry identity
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm whoami
+
+      - name: Build mocks (@aiti-ai/ddns-mocks)
+        run: npm run build
+
+      - name: Publish mocks
+        if: ${{ inputs.dry_run == 'false' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+      - name: Summary
+        run: |
+          echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "mocks version=$(node -p "require('./package.json').version")" >> "$GITHUB_STEP_SUMMARY"
+
   publish:
+    needs: mocks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
