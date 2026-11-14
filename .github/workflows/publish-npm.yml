@@ -53,7 +53,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm whoami
 
-      - name: Install deps (repo root — provides tsc + file: links)
+      - name: "Install deps (repo root — provides tsc + file links)"
         working-directory: .
         run: npm install --include=dev --no-audit --no-fund --loglevel=error
 
