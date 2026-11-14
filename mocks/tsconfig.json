@@ -1,1 +1,14 @@
-{"extends": "../tsconfig.json"}
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@aiti-ai/ddns": [
+        "../dist/index.d.ts"
+      ],
+      "@aiti-ai/ddns/*": [
+        "../dist/*.d.ts"
+      ]
+    },
+    "baseUrl": "."
+  }
+}

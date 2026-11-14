@@ -1,5 +1,6 @@
 {
   "extends": "./tsconfig.json",
+  "include": ["src/**/*.ts", "types/*.d.ts"],
   "compilerOptions": {
     "noEmit": false,
     "outDir": "dist",
@@ -7,7 +8,10 @@
     "declaration": true,
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
-    "sourceMap": false
-  },
-  "include": ["src/**/*.ts"]
+    "sourceMap": false,
+    "paths": {
+      "@aiti-ai/ddns": ["./src/index.ts"],
+      "@aiti-ai/ddns/*": ["./src/*.ts"]
+    }
+  }
 }

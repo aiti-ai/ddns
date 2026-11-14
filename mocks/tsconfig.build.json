@@ -7,7 +7,18 @@
     "declaration": true,
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
-    "sourceMap": false
+    "sourceMap": false,
+    "paths": {
+      "@aiti-ai/ddns": [
+        "../dist/index.d.ts"
+      ],
+      "@aiti-ai/ddns/*": [
+        "../dist/*.d.ts"
+      ]
+    },
+    "baseUrl": "."
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts"
+  ]
 }
