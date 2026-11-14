@@ -98,6 +98,12 @@ jobs:
       - name: Install deps
         run: npm ci --no-audit --no-fund --loglevel=error
 
+      # tests import @aiti-ai/ddns-mocks at runtime (node resolves the file:
+      # symlink to mocks/dist) — jobs do not share workspaces, so build it here.
+      - name: Build mocks first (tests import it at runtime)
+        working-directory: mocks
+        run: npm run build
+
       - name: Typecheck
         run: npm run typecheck
 
