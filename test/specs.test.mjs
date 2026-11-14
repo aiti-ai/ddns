@@ -11,8 +11,8 @@ const { REST_SPECS } = await import("../src/providers/rest-specs.ts");
 const { DYNDNS_SERVICES } = await import("../src/providers/dyndns-services.ts");
 const { RestProvider } = await import("../src/providers/rest.ts");
 const { DyndnsProvider } = await import("../src/providers/dyndns.ts");
-const { startRestMock } = await import("@aiti-ti/ddns-mocks");
-const { startDyndnsMock } = await import("@aiti-ti/ddns-mocks");
+const { startRestMock } = await import("@aiti-ai/ddns-mocks");
+const { startDyndnsMock } = await import("@aiti-ai/ddns-mocks");
 
 for (const spec of REST_SPECS) {
   test(`[rest] ${spec.name}: CRUD against its generic mock`, async () => {

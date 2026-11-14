@@ -7,11 +7,11 @@ import test from "node:test";
 import { request as httpRequest } from "node:http";
 
 const { FreednsProvider } = await import("../src/providers/freedns/index.ts");
-const { startFreednsMock } = await import("@aiti-ti/ddns-mocks");
+const { startFreednsMock } = await import("@aiti-ai/ddns-mocks");
 const { setBeacon, beaconValue } = await import("../src/beacon.ts");
 const { startServe } = await import("../src/serve.ts");
-const { startCloudflareMock } = await import("@aiti-ti/ddns-mocks");
-const { startDuckdnsMock } = await import("@aiti-ti/ddns-mocks");
+const { startCloudflareMock } = await import("@aiti-ai/ddns-mocks");
+const { startDuckdnsMock } = await import("@aiti-ai/ddns-mocks");
 const { updateEntry } = await import("../src/engine.ts");
 
 /* ------------------------------- freedns ------------------------------- */

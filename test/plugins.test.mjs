@@ -13,10 +13,10 @@ import { join } from "node:path";
 
 // module-level singleton registry — reset between tests is impossible, so we
 // use unique provider names per test
-// 插件注册/mock 走包入口（dist）：startMockProvider（@aiti-ti/ddns-mocks）内部用
+// 插件注册/mock 走包入口（dist）：startMockProvider（@aiti-ai/ddns-mocks）内部用
 // 的是 dist registry，必须同一实例才能 getMock 命中
-const { registerProvider, registerPlugin, discoverPlugins, registry, createProvider, isZoneProvider } = await import("@aiti-ti/ddns");
-const { startMockProvider } = await import("@aiti-ti/ddns-mocks");
+const { registerProvider, registerPlugin, discoverPlugins, registry, createProvider, isZoneProvider } = await import("@aiti-ai/ddns");
+const { startMockProvider } = await import("@aiti-ai/ddns-mocks");
 
 test("registerProvider: explicit factory works through createProvider", async () => {
   registerProvider("testplugin-a", (cfg) => ({

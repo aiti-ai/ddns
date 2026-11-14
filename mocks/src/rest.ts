@@ -3,7 +3,7 @@
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
-import type { RestSpec } from "@aiti-ti/ddns";
+import type { RestSpec } from "@aiti-ai/ddns";
 
 export interface RestMockOptions {
   spec: RestSpec;

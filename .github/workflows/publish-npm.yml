@@ -1,4 +1,4 @@
-# publish-npm.yml — publish @aiti-ti/ddns to the npm official registry
+# publish-npm.yml — publish @aiti-ai/ddns to the npm official registry
 # (registry.npmjs.org). Single-package variant of the aiti-ai/aiti-ai
 # publish-npm.yml decision matrix: this repo ships one package, so the
 # content-hash skip / auto-bump machinery is unnecessary — the version is

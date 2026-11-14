@@ -149,16 +149,16 @@ async function main(): Promise<void> {
     }
 
     case "mock": {
-      // mocks 独立包 @aiti-ti/ddns-mocks（不在运行时依赖里）：懒加载，未装给提示
+      // mocks 独立包 @aiti-ai/ddns-mocks（不在运行时依赖里）：懒加载，未装给提示
       let mocks: {
         startMockProvider: (name: string, opts: Record<string, unknown>) => Promise<{ url: string }>;
         startTlsProxy: (url: string) => Promise<{ tlsUrl: string; proxyUrl: string; caPath: string }>;
       };
       try {
-        mocks = await import("@aiti-ti/ddns-mocks");
+        mocks = await import("@aiti-ai/ddns-mocks");
       } catch {
         console.error(
-          "@aiti-ti/ddns-mocks 未安装——`ddns mock` 需要它。安装：npm i -D @aiti-ti/ddns-mocks（或 npm i @aiti-ti/ddns-mocks）",
+          "@aiti-ai/ddns-mocks 未安装——`ddns mock` 需要它。安装：npm i -D @aiti-ai/ddns-mocks（或 npm i @aiti-ai/ddns-mocks）",
         );
         process.exit(2);
       }

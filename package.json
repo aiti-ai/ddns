@@ -1,5 +1,5 @@
 {
-  "name": "@aiti-ti/ddns",
+  "name": "@aiti-ai/ddns",
   "version": "0.2.0",
   "description": "DDNS + DNS record management, multi-provider. Merges ddns-updater (Go) record-value updates with lexicon (Python) arbitrary record CRUD — every provider ships a mock implementation so the full flow is testable offline.",
   "type": "module",
@@ -60,6 +60,6 @@
   "devDependencies": {
     "@types/node": "^26.1.2",
     "typescript": "^5.8.3",
-    "@aiti-ti/ddns-mocks": "file:mocks"
+    "@aiti-ai/ddns-mocks": "file:mocks"
   }
 }

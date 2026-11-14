@@ -1,5 +1,5 @@
 {
-  "name": "@aiti-ti/ddns-mocks",
+  "name": "@aiti-ai/ddns-mocks",
   "version": "0.1.0",
   "description": "ddns provider 的 in-memory mock server（联调/测试用，独立于运行时包）",
   "type": "module",
@@ -20,9 +20,9 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "@aiti-ti/ddns": "^0.2.0"
+    "@aiti-ai/ddns": "^0.2.0"
   },
   "devDependencies": {
-    "@aiti-ti/ddns": "file:.."
+    "@aiti-ai/ddns": "file:.."
   }
 }

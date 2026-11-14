@@ -11,9 +11,9 @@
  *  HTTP API closely enough for third-party implementations (Go ddns-updater,
  *  Python lexicon) pointed at it to work too — including a TLS + CONNECT
  *  proxy face for statically-linked Go binaries that hardcode provider
- *  hostnames. The mocks live in the separate package @aiti-ti/ddns-mocks
+ *  hostnames. The mocks live in the separate package @aiti-ai/ddns-mocks
  *  (repo: mocks/), NOT in this runtime package; the `ddns mock` CLI command
- *  loads them lazily (install @aiti-ti/ddns-mocks to use it).
+ *  loads them lazily (install @aiti-ai/ddns-mocks to use it).
  */
 
 export type {

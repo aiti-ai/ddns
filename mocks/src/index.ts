@@ -26,7 +26,7 @@ import { startRestMock, type RestMockHandle, type RestMockOptions } from "./rest
 import { startDyndnsMock, type DyndnsMockHandle, type DyndnsMockOptions } from "./dyndns.ts";
 import { startLooseZoneMock, type LooseMockHandle, type LooseMockOptions } from "./loose.ts";
 import { startRoute53Mock, type Route53MockHandle, type Route53MockOptions } from "./route53.ts";
-import { registry } from "@aiti-ti/ddns/plugins";
+import { registry } from "@aiti-ai/ddns/plugins";
 
 export type AnyMockHandle = CloudflareMockHandle | DnspodMockHandle | AliyunMockHandle | DuckdnsMockHandle | CustomMockHandle | FreednsMockHandle | RestMockHandle | DyndnsMockHandle | LooseMockHandle | Route53MockHandle;
 
@@ -42,8 +42,8 @@ export type MockOptionsMap = {
 /** Start a mock for ANY registered provider name (rest specs + dyndns
  *  services get their generic mocks automatically). */
 export async function startMockFor(name: string, opts: { zone?: string; cred?: string; records?: Array<{ type: string; name: string; value: string; ttl?: number }>; port?: number } = {}): Promise<AnyMockHandle> {
-  const { REST_SPECS } = await import("@aiti-ti/ddns/rest-specs");
-  const { DYNDNS_SERVICES } = await import("@aiti-ti/ddns/dyndns-services");
+  const { REST_SPECS } = await import("@aiti-ai/ddns/rest-specs");
+  const { DYNDNS_SERVICES } = await import("@aiti-ai/ddns/dyndns-services");
   const rest = REST_SPECS.find((s) => s.name === name);
   if (rest) return startRestMock({ spec: rest, zone: opts.zone ?? "example.com", cred: opts.cred, records: opts.records, port: opts.port });
   const dyn = DYNDNS_SERVICES.find((s) => s.name === name);

@@ -9,8 +9,8 @@ import { connect as tlsConnect } from "node:tls";
 import { request as httpsRequest } from "node:https";
 import { readFileSync } from "node:fs";
 
-const { startCloudflareMock } = await import("@aiti-ti/ddns-mocks");
-const { startTlsProxy, caCertPath } = await import("@aiti-ti/ddns-mocks");
+const { startCloudflareMock } = await import("@aiti-ai/ddns-mocks");
+const { startTlsProxy, caCertPath } = await import("@aiti-ai/ddns-mocks");
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -139,7 +139,7 @@ test("smart routing: mock hosts → local; non-mock hosts → real forward", asy
   const { connect: netConnect } = await import("node:net");
   const { connect: tlsConnect } = await import("node:tls");
   const { readFileSync } = await import("node:fs");
-  const { startTlsProxy, MOCK_HOSTS } = await import("@aiti-ti/ddns-mocks");
+  const { startTlsProxy, MOCK_HOSTS } = await import("@aiti-ai/ddns-mocks");
 
   // 1) mock host (api.cloudflare.com) must hit the LOCAL mock
   const mock = await startCloudflareMock({ token: "tk", zones: { "example.com": [] } });
