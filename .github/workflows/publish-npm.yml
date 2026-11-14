@@ -98,9 +98,16 @@ jobs:
       - name: Install deps
         run: npm ci --no-audit --no-fund --loglevel=error
 
+      # Order matters twice: (1) the main build resolves the lazy
+      # @aiti-ai/ddns-mocks import against types/ddns-mocks.d.ts (stub), so it
+      # never needs mocks/dist; (2) the mocks build resolves @aiti-ai/ddns
+      # types against ../dist/*.d.ts, so the main dist must exist first.
+      - name: Build main package (stub-based, no mocks needed)
+        run: npm run build
+
       # tests import @aiti-ai/ddns-mocks at runtime (node resolves the file:
       # symlink to mocks/dist) — jobs do not share workspaces, so build it here.
-      - name: Build mocks first (tests import it at runtime)
+      - name: Build mocks (types from main dist, runtime dep of tests)
         working-directory: mocks
         run: npm run build
 
@@ -109,10 +116,6 @@ jobs:
 
       - name: Tests (all green or no publish)
         run: npm test
-
-      # dist/ is gitignored — the tarball can only ship what CI builds here.
-      - name: Build
-        run: npm run build
 
       - name: Pack — verify tarball contents (dist + src + docs present, no test/mocks leakage)
         run: |
