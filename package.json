@@ -1,7 +1,7 @@
 {
   "name": "@aiti-ai/ddns",
   "version": "0.2.0",
-  "description": "DDNS + DNS record management, multi-provider. Merges ddns-updater (Go) record-value updates with lexicon (Python) arbitrary record CRUD — every provider ships a mock implementation so the full flow is testable offline.",
+  "description": "DDNS + DNS record management, multi-provider. Merges ddns-updater (Go) record-value updates with lexicon (Python) arbitrary record CRUD \u2014 every provider ships a mock implementation so the full flow is testable offline.",
   "type": "module",
   "bin": {
     "ddns": "./src/cli.ts",
@@ -61,5 +61,9 @@
     "@types/node": "^26.1.2",
     "typescript": "^5.8.3",
     "@aiti-ai/ddns-mocks": "file:mocks"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aiti-ai/ddns.git"
   }
 }
