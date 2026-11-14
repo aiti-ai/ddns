@@ -53,6 +53,16 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm whoami
 
+      - name: Install deps (repo root — provides tsc + file: links)
+        working-directory: .
+        run: npm install --include=dev --no-audit --no-fund --loglevel=error
+
+      # mocks resolves @aiti-ai/ddns types against ../dist/*.d.ts (see
+      # mocks/tsconfig.build.json paths) — the main dist must exist first.
+      - name: Build main package (provides dist types for mocks)
+        working-directory: .
+        run: npm run build
+
       - name: Build mocks (@aiti-ai/ddns-mocks)
         run: npm run build
 
